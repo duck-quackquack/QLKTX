@@ -1,0 +1,1170 @@
+﻿1. Mục tiêu của hệ thống
+Website sẽ phục vụ ít nhất 3 nhóm người dùng:
+Admin / Quản trị viên
+Quản lý toàn bộ hệ thống:
+Quản lý sinh viên 
+Quản lý phòng 
+Quản lý tòa nhà 
+Quản lý giường 
+Quản lý hợp đồng 
+Quản lý đăng ký phòng 
+Quản lý tiền phòng 
+Quản lý điện/nước 
+Quản lý thanh toán 
+Quản lý vi phạm 
+Quản lý yêu cầu sửa chữa 
+Thống kê/báo cáo 
+Quản lý tài khoản và phân quyền 
+Nhân viên KTX
+Có thể:
+Tiếp nhận sinh viên 
+Xếp phòng 
+Quản lý hợp đồng 
+Theo dõi tiền phòng 
+Xử lý yêu cầu sửa chữa 
+Quản lý vi phạm 
+Xem báo cáo 
+Sinh viên
+Có thể:
+Đăng nhập 
+Xem thông tin cá nhân 
+Xem phòng/giường 
+Đăng ký ở KTX 
+Xem hợp đồng 
+Xem tiền phòng 
+Xem lịch sử thanh toán 
+Gửi yêu cầu sửa chữa 
+Xem thông báo 
+Xem vi phạm của mình 
+
+2. Kiến trúc tổng thể
+Mình đề xuất kiến trúc:
+                    ┌─────────────────────┐
+                    │      Browser        │
+                    │                     │
+                    │ React + TypeScript  │
+                    └──────────┬──────────┘
+                               │
+                         HTTP / HTTPS
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │    ASP.NET Core     │
+                    │      Web API        │
+                    ├─────────────────────┤
+                    │ Controllers          │
+                    │ Application          │
+                    │ Domain               │
+                    │ Infrastructure       │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Entity Framework     │
+                    │       Core           │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │     SQL Server      │
+                    └─────────────────────┘
+Backend nên dùng Clean Architecture thay vì nhét toàn bộ code vào Controller.
+
+3. Cấu trúc Backend
+Solution:
+DormitoryManagement.sln
+
+src/
+├── DormitoryManagement.API
+├── DormitoryManagement.Application
+├── DormitoryManagement.Domain
+└── DormitoryManagement.Infrastructure
+
+tests/
+├── DormitoryManagement.UnitTests
+└── DormitoryManagement.IntegrationTests
+Domain
+Chứa business model:
+Domain/
+├── Entities/
+├── Enums/
+├── Exceptions/
+├── Interfaces/
+└── Common/
+Ví dụ:
+Student
+Building
+Room
+Bed
+Contract
+Payment
+Invoice
+Violation
+RepairRequest
+Notification
+User
+Role
+
+Application
+Chứa nghiệp vụ:
+Application/
+├── DTOs/
+├── Services/
+├── Interfaces/
+├── Validators/
+├── Mappings/
+└── Features/
+Có thể tổ chức theo module:
+Features/
+├── Students/
+├── Buildings/
+├── Rooms/
+├── Beds/
+├── Contracts/
+├── Payments/
+├── Violations/
+├── Repairs/
+└── Reports/
+
+Infrastructure
+Infrastructure/
+├── Data/
+│   ├── ApplicationDbContext.cs
+│   ├── Configurations/
+│   └── Migrations/
+│
+├── Repositories/
+├── Identity/
+├── Services/
+│   ├── EmailService.cs
+│   └── FileService.cs
+└── DependencyInjection.cs
+
+API
+API/
+├── Controllers/
+├── Middleware/
+├── Filters/
+├── Extensions/
+├── Program.cs
+└── appsettings.json
+
+4. Database Design
+Đây là phần rất quan trọng. Không nên code frontend trước khi xác định database và nghiệp vụ.
+Mô hình cơ bản:
+Building
+   │
+   │ 1 - N
+   ▼
+Room
+   │
+   │ 1 - N
+   ▼
+Bed
+   │
+   │
+   │ 1 - 0..1
+   ▼
+Student
+Nhưng thực tế cần thêm các bảng trung gian.
+Các bảng chính
+Users
+Users
+--------------------
+Id
+Username
+Email
+PasswordHash
+RoleId
+IsActive
+CreatedAt
+Có thể để ASP.NET Core Identity quản lý phần này.
+
+Students
+Students
+--------------------
+Id
+StudentCode
+FullName
+DateOfBirth
+Gender
+Phone
+Email
+Address
+Faculty
+ClassName
+AvatarUrl
+CreatedAt
+
+Buildings
+Buildings
+--------------------
+Id
+Code
+Name
+Address
+NumberOfFloors
+Description
+
+Rooms
+Rooms
+--------------------
+Id
+BuildingId
+RoomNumber
+Floor
+RoomType
+Capacity
+Price
+Status
+Description
+
+Beds
+Beds
+--------------------
+Id
+RoomId
+BedNumber
+Status
+
+Contracts
+Contracts
+--------------------
+Id
+StudentId
+RoomId
+BedId
+StartDate
+EndDate
+Status
+Deposit
+
+Invoices
+Invoices
+--------------------
+Id
+StudentId
+ContractId
+Month
+Year
+RoomFee
+ElectricityFee
+WaterFee
+OtherFee
+TotalAmount
+DueDate
+Status
+
+Payments
+Payments
+--------------------
+Id
+InvoiceId
+Amount
+PaymentDate
+PaymentMethod
+TransactionCode
+Status
+
+Violations
+Violations
+--------------------
+Id
+StudentId
+Title
+Description
+ViolationType
+PenaltyAmount
+CreatedAt
+Status
+
+RepairRequests
+RepairRequests
+--------------------
+Id
+StudentId
+RoomId
+Title
+Description
+Priority
+Status
+CreatedAt
+CompletedAt
+
+Notifications
+Notifications
+--------------------
+Id
+UserId
+Title
+Content
+Type
+IsRead
+CreatedAt
+
+5. Quan hệ Database
+Một phiên bản đơn giản:
+Building
+   │
+   ├────< Room
+   │        │
+   │        └────< Bed
+   │
+   └────< ...
+
+Student
+   │
+   ├────< Contract
+   │
+   ├────< Invoice
+   │
+   ├────< Violation
+   │
+   ├────< RepairRequest
+   │
+   └────< Notification
+
+Contract
+   │
+   └────< Invoice
+              │
+              └────< Payment
+
+6. Các module cần xây dựng
+Mình sẽ chia project thành 10 module.
+Module 1 — Authentication
+Backend
+POST /api/auth/login
+POST /api/auth/register
+POST /api/auth/refresh-token
+POST /api/auth/logout
+GET  /api/auth/me
+Frontend
+Login 
+Forgot password 
+Change password 
+Profile 
+
+7. Module quản lý sinh viên
+API:
+GET    /api/students
+GET    /api/students/{id}
+POST   /api/students
+PUT    /api/students/{id}
+DELETE /api/students/{id}
+Frontend:
+Students
+├── StudentList
+├── StudentDetail
+├── StudentCreate
+└── StudentEdit
+Các chức năng:
+Search 
+Filter 
+Pagination 
+Sort 
+Import Excel 
+Export Excel 
+
+8. Module quản lý tòa nhà
+GET    /api/buildings
+GET    /api/buildings/{id}
+POST   /api/buildings
+PUT    /api/buildings/{id}
+DELETE /api/buildings/{id}
+Frontend:
+Buildings
+├── BuildingList
+├── BuildingDetail
+└── BuildingForm
+
+9. Module quản lý phòng
+Đây sẽ là module quan trọng.
+Admin có thể:
+Tòa A
+ ├── A101
+ │    ├── Bed 01 - Nguyễn Văn A
+ │    ├── Bed 02 - Trần Văn B
+ │    ├── Bed 03 - Empty
+ │    └── Bed 04 - Empty
+ │
+ ├── A102
+ │    ├── Bed 01 - ...
+ │    └── ...
+Frontend nên có Room Map:
+┌─────────────────────────────────┐
+│             TÒA A               │
+├─────────┬─────────┬─────────────┤
+│ A101    │ A102    │ A103        │
+│ 2/4     │ 4/4     │ 1/4         │
+│ 🟢      │ 🔴      │ 🟢          │
+├─────────┼─────────┼─────────────┤
+│ A201    │ A202    │ A203        │
+│ 3/4     │ 0/4     │ 2/4         │
+│ 🟢      │ 🟢      │ 🟢          │
+└─────────┴─────────┴─────────────┘
+
+10. Module đăng ký KTX
+Sinh viên:
+Đăng ký KTX
+      ↓
+Chọn thời gian
+      ↓
+Chọn tòa
+      ↓
+Chọn loại phòng
+      ↓
+Gửi đăng ký
+      ↓
+Chờ duyệt
+Status:
+Pending
+Approved
+Rejected
+Cancelled
+Admin:
+Danh sách đăng ký
+       ↓
+      Duyệt
+       ↓
+Chọn phòng/giường
+       ↓
+Tạo Contract
+
+11. Module hợp đồng
+Flow:
+Student
+   ↓
+Registration
+   ↓
+Approved
+   ↓
+Room + Bed
+   ↓
+Contract
+   ↓
+Active
+Hợp đồng cần quản lý:
+Ngày bắt đầu 
+Ngày kết thúc 
+Tiền đặt cọc 
+Phòng 
+Giường 
+Sinh viên 
+Trạng thái 
+
+12. Module tiền phòng
+Đây là module nên thiết kế kỹ.
+Ví dụ:
+Tiền phòng       800.000
+Điện             120.000
+Nước              50.000
+Phí khác          30.000
+-------------------------
+Tổng             1.000.000
+Backend có thể tự động tạo Invoice hàng tháng.
+Ví dụ:
+01/09
+   ↓
+Generate Monthly Invoice
+   ↓
+Invoice September
+   ↓
+Student receives notification
+   ↓
+Student pays
+   ↓
+Payment completed
+
+13. Module thanh toán
+MVP ban đầu:
+Cash
+Bank Transfer
+Sau đó có thể mở rộng:
+VNPay
+MoMo
+ZaloPay
+Không nên tích hợp payment gateway ngay từ đầu.
+Làm:
+Invoice
+   ↓
+Payment
+   ↓
+Payment Status
+trước.
+
+14. Module điện nước
+Có thể thiết kế:
+MeterReading
+--------------------
+Id
+RoomId
+Month
+Year
+ElectricityOld
+ElectricityNew
+WaterOld
+WaterNew
+Công thức:
+ElectricityUsage =
+ElectricityNew - ElectricityOld
+ElectricityFee =
+ElectricityUsage × ElectricityPrice
+Tương tự nước.
+
+15. Module vi phạm
+Ví dụ:
+Sinh viên
+   ↓
+Vi phạm
+   ↓
+Lập biên bản
+   ↓
+Mức phạt
+   ↓
+Theo dõi xử lý
+Frontend:
+Violation List
+
+Student | Violation | Penalty | Date | Status
+------------------------------------------------
+SV001   | Gây ồn    | 100.000  | ...  | Paid
+SV002   | Hút thuốc | 200.000  | ...  | Unpaid
+
+16. Module yêu cầu sửa chữa
+Sinh viên:
+Phòng A101
+     ↓
+Báo hỏng vòi nước
+     ↓
+Tạo Repair Request
+Nhân viên:
+Pending
+   ↓
+Processing
+   ↓
+Completed
+Có thể cho phép upload ảnh.
+
+17. Module thông báo
+Thông báo:
+Hợp đồng sắp hết hạn
+
+Tiền phòng tháng 9 chưa thanh toán
+
+Yêu cầu sửa chữa đã hoàn thành
+
+Bạn có một vi phạm mới
+Backend:
+NotificationService
+Sau này có thể thêm:
+Email
+SignalR
+Push Notification
+
+18. Dashboard
+Đây sẽ là trang chính của Admin.
+Ví dụ:
+┌────────────────┬────────────────┬────────────────┐
+│ Tổng sinh viên │ Tổng phòng     │ Phòng còn trống│
+│     1,250      │      320       │       45       │
+└────────────────┴────────────────┴────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│                 TỶ LỆ LẤP ĐẦY                      │
+│                                                    │
+│                    86.5%                           │
+└────────────────────────────────────────────────────┘
+
+┌───────────────────────┬────────────────────────────┐
+│ Doanh thu tháng       │ Công nợ                    │
+│ 520.000.000đ          │ 35.000.000đ                │
+└───────────────────────┴────────────────────────────┘
+Biểu đồ:
+Số sinh viên theo tháng 
+Tỷ lệ lấp đầy phòng 
+Doanh thu 
+Công nợ 
+Số lượt sửa chữa 
+Số vi phạm 
+
+19. Frontend structure
+Nếu dùng React:
+frontend/
+└── src/
+    ├── api/
+    │   ├── axios.ts
+    │   ├── authApi.ts
+    │   ├── studentApi.ts
+    │   ├── roomApi.ts
+    │   └── paymentApi.ts
+    │
+    ├── components/
+    │   ├── Button/
+    │   ├── Modal/
+    │   ├── Table/
+    │   ├── Form/
+    │   └── Pagination/
+    │
+    ├── layouts/
+    │   ├── AdminLayout.tsx
+    │   └── StudentLayout.tsx
+    │
+    ├── pages/
+    │   ├── Auth/
+    │   ├── Dashboard/
+    │   ├── Students/
+    │   ├── Buildings/
+    │   ├── Rooms/
+    │   ├── Contracts/
+    │   ├── Payments/
+    │   ├── Violations/
+    │   └── Repairs/
+    │
+    ├── hooks/
+    ├── contexts/
+    ├── types/
+    ├── utils/
+    └── App.tsx
+
+20. Frontend routing
+/login
+
+/admin
+/admin/dashboard
+
+/admin/students
+/admin/students/:id
+
+/admin/buildings
+/admin/buildings/:id
+
+/admin/rooms
+/admin/rooms/:id
+
+/admin/contracts
+
+/admin/invoices
+/admin/payments
+
+/admin/violations
+
+/admin/repairs
+
+/admin/reports
+
+/student
+/student/dashboard
+/student/profile
+/student/room
+/student/contract
+/student/invoices
+/student/payments
+/student/repairs
+/student/notifications
+
+21. Authentication & Authorization
+Nên sử dụng:
+ASP.NET Core Identity
+        +
+       JWT
+Role:
+Admin
+Staff
+Student
+Ví dụ:
+[Authorize(Roles = "Admin")]
+[HttpPost]public async Task<IActionResult> CreateStudent(...)
+{
+    ...
+}
+Sinh viên:
+[Authorize(Roles = "Student")]
+
+22. API chuẩn hóa
+Response nên thống nhất:
+{
+  "success": true,
+  "message": "Success",
+  "data": {},
+  "errors": []
+}
+Pagination:
+{
+  "success": true,
+  "data": {
+    "items": [],
+    "page": 1,
+    "pageSize": 20,
+    "totalItems": 1250,
+    "totalPages": 63
+  }
+}
+
+23. Validation
+Ví dụ tạo sinh viên:
+StudentCode
+→ Required
+→ Unique
+
+FullName
+→ Required
+→ MaxLength(100)
+
+Email
+→ Required
+→ Email format
+
+Phone
+→ Required
+→ Valid phone number
+Không nên chỉ validate ở frontend.
+Phải validate:
+Frontend
+   +
+Backend
+
+24. Error handling
+Tạo:
+GlobalExceptionMiddleware
+Ví dụ:
+400 Bad Request
+401 Unauthorized
+403 Forbidden
+404 Not Found
+409 Conflict
+422 Validation Error
+500 Internal Server Error
+Không trả stack trace ra frontend trong production.
+
+25. Logging
+Dùng Serilog.
+Log:
+User login
+Create student
+Update room
+Create contract
+Payment
+Exception
+Production nên có:
+Information
+Warning
+Error
+Critical
+
+26. Backend development roadmap
+Mình khuyên không code tất cả cùng lúc.
+Lộ trình:
+Phase 0 — Phân tích
+Thời gian: 1–2 ngày
+Làm:
+Requirements
+Use Case
+Actor
+Business Rules
+Database ERD
+API Specification
+Deliverables:
+Use Case Diagram
+ERD
+API List
+Wireframe
+
+27. Phase 1 — Setup project
+Ngày 1–2:
+Create Solution
+      ↓
+Create API
+      ↓
+Create Domain
+      ↓
+Create Application
+      ↓
+Create Infrastructure
+      ↓
+Connect SQL Server
+Setup:
+EF Core 
+Identity 
+JWT 
+Swagger 
+Serilog 
+CORS 
+Dependency Injection 
+
+28. Phase 2 — Database
+Ngày 3–5:
+Tạo:
+Users
+Students
+Buildings
+Rooms
+Beds
+Contracts
+Invoices
+Payments
+Violations
+RepairRequests
+Notifications
+Sau đó:
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+Kiểm tra toàn bộ FK và constraint.
+
+29. Phase 3 — Authentication
+Ngày 6–7:
+Implement:
+Register
+Login
+JWT
+Refresh Token
+Logout
+Current User
+Roles
+Authorization
+Test bằng Swagger/Postman trước khi làm frontend.
+
+30. Phase 4 — CRUD cơ bản
+Tuần 2:
+Làm theo thứ tự:
+Building
+   ↓
+Room
+   ↓
+Bed
+   ↓
+Student
+Mỗi module đều hoàn thành:
+Entity
+ ↓
+DTO
+ ↓
+Validator
+ ↓
+Service
+ ↓
+Controller
+ ↓
+Swagger test
+
+31. Phase 5 — Business logic
+Tuần 3:
+Làm:
+Registration
+      ↓
+Approval
+      ↓
+Room assignment
+      ↓
+Contract
+Sau đó:
+Contract
+      ↓
+Invoice
+      ↓
+Payment
+Đây là phần quan trọng nhất của backend.
+
+32. Phase 6 — Các nghiệp vụ phụ
+Tuần 4:
+Electricity / Water
+Violations
+Repair Requests
+Notifications
+Reports
+
+33. Phase 7 — Frontend
+Không nên chờ backend 100% mới làm frontend.
+Có thể bắt đầu frontend từ tuần 2.
+Thứ tự:
+Layout
+ ↓
+Login
+ ↓
+Dashboard
+ ↓
+Student
+ ↓
+Building
+ ↓
+Room
+ ↓
+Contract
+ ↓
+Invoice
+ ↓
+Payment
+ ↓
+Violation
+ ↓
+Repair
+ ↓
+Notification
+
+34. Phase 8 — Dashboard
+Sau khi API ổn:
+GET /api/dashboard/statistics
+Response:
+{
+  "totalStudents": 1250,
+  "totalRooms": 320,
+  "occupiedBeds": 1050,
+  "availableBeds": 230,
+  "occupancyRate": 82.03,
+  "monthlyRevenue": 520000000,
+  "unpaidAmount": 35000000
+}
+Frontend dùng chart để hiển thị.
+
+35. Phase 9 — Testing
+Không được bỏ qua bước này.
+Unit test
+Test:
+InvoiceService
+ContractService
+RoomService
+PaymentService
+Ví dụ:
+Room capacity = 4
+Current students = 4
+
+→ Cannot assign another student
+
+Integration test
+Test:
+POST /api/contracts
+       ↓
+Database
+       ↓
+Contract created
+       ↓
+Bed status updated
+
+Frontend test
+Kiểm tra:
+Login
+CRUD
+Form validation
+Pagination
+Search
+Role permission
+
+36. Phase 10 — Security
+Trước khi deploy phải kiểm tra:
+JWT
+Password hashing
+CORS
+SQL Injection
+XSS
+CSRF
+File upload
+Authorization
+Rate limiting
+Input validation
+Đặc biệt:
+Không bao giờ tin StudentId, UserId, Role do frontend gửi lên.
+Backend phải lấy identity từ JWT và kiểm tra quyền.
+
+37. Phase 11 — Docker
+Cuối project:
+Docker
+   │
+   ├── Frontend
+   ├── Backend
+   └── SQL Server
+Ví dụ:
+docker-compose.yml
+
+services:
+
+  frontend:
+    ...
+
+  backend:
+    ...
+
+  sqlserver:
+    ...
+
+38. Phase 12 — Deploy
+Production:
+Domain
+   │
+   ▼
+Nginx
+   │
+   ├───────────────┐
+   ▼               ▼
+Frontend         Backend
+                    │
+                    ▼
+                 SQL Server
+Có HTTPS:
+https://kytucxa.example.com
+https://api.kytucxa.example.com
+
+39. Timeline hoàn chỉnh
+Nếu làm một mình, mình đề xuất khoảng 8–10 tuần.
+Tuần
+Công việc
+1
+Phân tích + ERD + kiến trúc + setup
+2
+Database + Identity + JWT
+3
+Student + Building + Room + Bed
+4
+Registration + Contract
+5
+Invoice + Payment + điện nước
+6
+Violation + Repair + Notification
+7
+Frontend hoàn chỉnh
+8
+Dashboard + Report
+9
+Testing + Security + Bug fixing
+10
+Docker + Deploy + Documentation
+Nếu đây là đồ án sinh viên, có thể rút xuống khoảng 5–7 tuần bằng cách bỏ các phần nâng cao như payment gateway, email tự động, Docker production, refresh token phức tạp...
+
+40. MVP nên làm trước
+Đừng ngay lập tức làm 20 chức năng.
+Phiên bản MVP chỉ cần:
+Authentication
+        ↓
+Student
+        ↓
+Building
+        ↓
+Room
+        ↓
+Bed
+        ↓
+Registration
+        ↓
+Contract
+        ↓
+Invoice
+        ↓
+Payment
+        ↓
+Dashboard
+Khi MVP chạy ổn mới thêm:
+Electricity
+Water
+Violation
+Repair
+Notification
+Email
+Reports
+Payment Gateway
+
+41. Definition of Done
+Một module chỉ coi là hoàn thành khi có đủ:
+☑ Entity
+☑ Database migration
+☑ DTO
+☑ Validation
+☑ Service
+☑ Controller
+☑ Authorization
+☑ Swagger
+☑ Unit test
+☑ Frontend API
+☑ UI
+☑ Loading state
+☑ Error handling
+☑ Empty state
+☑ Pagination
+☑ Search/filter nếu cần
+Ví dụ module Student:
+Database
+   ↓
+Student Entity
+   ↓
+StudentRepository
+   ↓
+StudentService
+   ↓
+StudentController
+   ↓
+Swagger
+   ↓
+React API
+   ↓
+StudentTable
+   ↓
+Create/Edit Modal
+   ↓
+Validation
+   ↓
+Testing
+
+42. Thứ tự chúng ta nên triển khai thực tế
+Nếu bạn muốn bắt tay code ngay, mình đề xuất đi theo đúng thứ tự này:
+                    KTX MANAGEMENT
+                          │
+             ┌────────────┴────────────┐
+             │                         │
+          BACKEND                   FRONTEND
+             │                         │
+       ASP.NET Core                 React
+             │                         │
+       Clean Architecture           TypeScript
+             │                         │
+        SQL Server ◄──────────────► Axios
+             │
+       Entity Framework
+             │
+       Identity + JWT
+             │
+       ┌─────┴─────┐
+       │           │
+   AUTHENTICATION  RBAC
+       │           │
+       └─────┬─────┘
+             │
+         STUDENTS
+             │
+         BUILDINGS
+             │
+           ROOMS
+             │
+            BEDS
+             │
+       REGISTRATION
+             │
+         CONTRACT
+             │
+          INVOICE
+             │
+          PAYMENT
+             │
+      ELECTRIC/WATER
+             │
+        VIOLATION
+             │
+          REPAIR
+             │
+       NOTIFICATION
+             │
+          REPORT
+             │
+         DASHBOARD
+             │
+           TEST
+             │
+          DOCKER
+             │
+          DEPLOY
+Và mình khuyên project nên có 4 mốc lớn
+Mốc 1 — Foundation
+Architecture → Database → Authentication → Authorization
+Mốc 2 — Core KTX
+Student → Building → Room → Bed → Registration → Contract
+Mốc 3 — Finance
+Invoice → Electricity/Water → Payment → Debt
+Mốc 4 — Production
+Dashboard → Notification → Report → Testing → Security → Docker → Deploy
