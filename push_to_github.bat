@@ -1,6 +1,6 @@
 @echo off
 set "PATH=C:\Users\AD\MinGit\cmd;C:\Users\AD\MinGit\ucrt64\bin;%PATH%"
-cd /d "D:\QLKTX"
+cd /d "%~dp0"
 echo ========================================================
 echo DANG PUSH DU AN QLKTX LEN GITHUB...
 echo Repo: https://github.com/duck-quackquack/QLKTX.git
