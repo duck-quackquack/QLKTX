@@ -5,7 +5,7 @@ echo ========================================================
 echo DANG PUSH DU AN QLKTX LEN GITHUB...
 echo Repo: https://github.com/duck-quackquack/QLKTX.git
 echo ========================================================
-git push -u origin main
+git push origin HEAD
 echo.
 echo ========================================================
 echo HOAN TAT! Nhan phim bat ky de thoat...
