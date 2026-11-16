@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from '../../components/layout/Header';
-import { StatCard } from '../../components/ui/StatCard';
+import { StatCard } from '../../components/common/StatCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { dashboardApi } from '../../api';
 import { DashboardStatistics } from '../../types';

@@ -6,13 +6,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5000:8080"
+      - "5000:5000"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Data Source=dormitory.db
-      - DatabaseProvider=Sqlite
-    volumes:
-      - ktx_data:/app/data
+      - PORT=5000
+      - NODE_ENV=production
+    restart: always
 
   frontend:
     build:
@@ -22,6 +20,4 @@ services:
       - "3000:80"
     depends_on:
       - backend
-
-volumes:
-  ktx_data:
+    restart: always
