@@ -17,6 +17,7 @@ import violationRoutes from './routes/violationRoutes.js';
 import repairRoutes from './routes/repairRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import bankAccountRoutes from './routes/bankAccountRoutes.js';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/api/violations', violationRoutes);
 app.use('/api/repairs', repairRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/bank-accounts', bankAccountRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

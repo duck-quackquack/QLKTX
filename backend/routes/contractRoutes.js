@@ -7,6 +7,7 @@ import {
   createContract,
   terminateContract,
   renewContract,
+  syncContracts,
 } from '../controllers/contractController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.use(protect);
 
+router.post('/sync-expired', authorize(1, 2), syncContracts);
 router.get('/my-active', getMyActiveContract);
 router.get('/my', getMyContracts);
 router.get('/:id', getContractById);

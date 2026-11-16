@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 // Layouts
 import { AdminLayout } from './components/layout/AdminLayout';
@@ -34,6 +35,7 @@ import { StudentInvoicesPage } from './pages/student/StudentInvoicesPage';
 import { StudentRepairsPage } from './pages/student/StudentRepairsPage';
 import { StudentViolationsPage } from './pages/student/StudentViolationsPage';
 import { StudentNotificationsPage } from './pages/student/StudentNotificationsPage';
+import { VerifyPassPage } from './pages/public/VerifyPassPage';
 
 const RootRedirect: React.FC = () => {
   const { user, loading, isAdminOrStaff } = useAuth();
@@ -47,10 +49,12 @@ export const App: React.FC = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-pass" element={<VerifyPassPage />} />
           {/* Admin Protected Routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />

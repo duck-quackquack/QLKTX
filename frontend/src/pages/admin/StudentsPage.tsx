@@ -15,10 +15,17 @@ import {
   Download,
   Filter,
   UserCheck,
-  UserX
+  UserX,
+  GraduationCap,
+  Check,
+  X,
+  Building2,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const StudentsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 1;
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -27,6 +34,14 @@ export const StudentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [facultyFilter, setFacultyFilter] = useState('');
   const [stayingFilter, setStayingFilter] = useState<string>('');
+
+  // Faculty Management State
+  const [faculties, setFaculties] = useState<{ name: string; count: number }[]>([]);
+  const [isFacultyModalOpen, setIsFacultyModalOpen] = useState(false);
+  const [newFacultyName, setNewFacultyName] = useState('');
+  const [editingFaculty, setEditingFaculty] = useState<{ oldName: string; newName: string } | null>(null);
+  const [facultyLoading, setFacultyLoading] = useState(false);
+  const [facultyMsg, setFacultyMsg] = useState('');
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -38,6 +53,8 @@ export const StudentsPage: React.FC = () => {
   const [createForm, setCreateForm] = useState({
     studentCode: '',
     fullName: '',
+    username: '',
+    password: '',
     dateOfBirth: '2004-01-01',
     gender: 'Nam',
     phone: '',
@@ -45,7 +62,6 @@ export const StudentsPage: React.FC = () => {
     address: '',
     faculty: 'Công nghệ Thông tin',
     className: '',
-    citizenId: '',
     createAccount: true,
   });
 
@@ -74,9 +90,74 @@ export const StudentsPage: React.FC = () => {
     }
   };
 
+  const fetchFaculties = async () => {
+    try {
+      const res = await studentApi.getFaculties();
+      if (res.success && res.data) {
+        setFaculties(res.data);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách khoa:', err);
+    }
+  };
+
   useEffect(() => {
     fetchStudents();
   }, [page, facultyFilter, stayingFilter]);
+
+  useEffect(() => {
+    fetchFaculties();
+  }, []);
+
+  const handleRenameFaculty = async () => {
+    if (!editingFaculty || !editingFaculty.newName.trim()) return;
+    setFacultyLoading(true);
+    try {
+      const res = await studentApi.updateFaculty({
+        oldName: editingFaculty.oldName,
+        newName: editingFaculty.newName.trim(),
+      });
+      if (res.success) {
+        setFacultyMsg(res.message);
+        setEditingFaculty(null);
+        await fetchFaculties();
+        await fetchStudents();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Cập nhật tên khoa thất bại');
+    } finally {
+      setFacultyLoading(false);
+    }
+  };
+
+  const handleDeleteFaculty = async (facultyName: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa khoa "${facultyName}"? Các sinh viên thuộc khoa này sẽ được chuyển thành chưa phân khoa.`)) return;
+    setFacultyLoading(true);
+    try {
+      const res = await studentApi.deleteFaculty({ facultyName });
+      if (res.success) {
+        setFacultyMsg(res.message);
+        await fetchFaculties();
+        await fetchStudents();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Xóa khoa thất bại');
+    } finally {
+      setFacultyLoading(false);
+    }
+  };
+
+  const handleAddFaculty = () => {
+    if (!newFacultyName.trim()) return;
+    const name = newFacultyName.trim();
+    if (faculties.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+      alert('Khoa này đã tồn tại trong danh sách!');
+      return;
+    }
+    setFaculties([...faculties, { name, count: 0 }]);
+    setNewFacultyName('');
+    setFacultyMsg(`Đã thêm khoa "${name}" vào danh mục lựa chọn.`);
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +177,8 @@ export const StudentsPage: React.FC = () => {
         setCreateForm({
           studentCode: '',
           fullName: '',
+          username: '',
+          password: '',
           dateOfBirth: '2004-01-01',
           gender: 'Nam',
           phone: '',
@@ -103,7 +186,6 @@ export const StudentsPage: React.FC = () => {
           address: '',
           faculty: 'Công nghệ Thông tin',
           className: '',
-          citizenId: '',
           createAccount: true,
         });
         fetchStudents();
@@ -154,6 +236,38 @@ export const StudentsPage: React.FC = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!students || students.length === 0) {
+      alert('Không có dữ liệu sinh viên để xuất.');
+      return;
+    }
+    const headers = ['STT', 'Mã SV', 'Họ và tên', 'Giới tính', 'Ngày sinh', 'Số ĐT', 'Email', 'Khoa', 'Lớp', 'Phòng', 'Giường', 'Trạng thái'];
+    const rows = students.map((s, idx) => [
+      idx + 1,
+      `"${s.studentCode}"`,
+      `"${s.fullName}"`,
+      `"${s.gender || 'Nam'}"`,
+      `"${s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('vi-VN') : ''}"`,
+      `"${s.phone || ''}"`,
+      `"${s.email || ''}"`,
+      `"${s.faculty || ''}"`,
+      `"${s.className || ''}"`,
+      `"${s.currentRoomNumber ? 'P.' + s.currentRoomNumber : '—'}"`,
+      `"${s.currentBedNumber ? 'G.' + s.currentBedNumber : '—'}"`,
+      `"${s.isStaying ? 'Đang ở KTX' : 'Chưa ở KTX'}"`
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `danh_sach_sinh_vien_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
       <Header
@@ -169,10 +283,19 @@ export const StudentsPage: React.FC = () => {
             <p className="text-sm text-slate-500 mt-0.5">Tổng cộng {totalItems} sinh viên đăng ký nội trú</p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                icon={<GraduationCap size={14} />}
+                onClick={() => setIsFacultyModalOpen(true)}
+              >
+                Quản lý Khoa / Viện
+              </Button>
+            )}
             <Button
               variant="secondary"
               icon={<Download size={14} />}
-              onClick={() => alert('Xuất danh sách sinh viên ra file Excel thành công!')}
+              onClick={handleExportCSV}
             >
               Xuất Excel
             </Button>
@@ -206,10 +329,11 @@ export const StudentsPage: React.FC = () => {
               className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none bg-white text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">Tất cả khoa</option>
-              <option value="Công nghệ Thông tin">Công nghệ Thông tin</option>
-              <option value="Kinh tế & Quản trị">Kinh tế & Quản trị</option>
-              <option value="Điện tử Viễn thông">Điện tử Viễn thông</option>
-              <option value="Ngoại ngữ">Ngoại ngữ</option>
+              {faculties.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.name} {f.count > 0 ? `(${f.count})` : ''}
+                </option>
+              ))}
             </select>
 
             <select
@@ -286,16 +410,18 @@ export const StudentsPage: React.FC = () => {
                         >
                           <Edit2 size={14} />
                         </button>
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(s);
-                            setShowDelete(true);
-                          }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Xóa"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setSelectedStudent(s);
+                              setShowDelete(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Xóa"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -360,7 +486,17 @@ export const StudentsPage: React.FC = () => {
               label="Mã sinh viên"
               placeholder="VD: SV2026010"
               value={createForm.studentCode}
-              onChange={(e) => setCreateForm({ ...createForm, studentCode: e.target.value })}
+              onChange={(e) => {
+                const code = e.target.value;
+                setCreateForm({
+                  ...createForm,
+                  studentCode: code,
+                  // Auto-suggest username if empty or matching old code
+                  username: createForm.username === '' || createForm.username === createForm.studentCode.toLowerCase()
+                    ? code.toLowerCase()
+                    : createForm.username,
+                });
+              }}
               required
             />
             <Input
@@ -372,7 +508,44 @@ export const StudentsPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Tên đăng nhập (Username)"
+              placeholder="VD: sv2026010"
+              value={createForm.username}
+              onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
+              required={createForm.createAccount}
+              helperText="Tên dùng để đăng nhập vào cổng KTX"
+            />
+            <Input
+              label="Mật khẩu khởi tạo"
+              type="password"
+              placeholder="Mặc định: Ktx@123456"
+              value={createForm.password}
+              onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              helperText="Để trống để sử dụng mật khẩu mặc định: Ktx@123456"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="student@example.com"
+              value={createForm.email}
+              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              required
+            />
+            <Input
+              label="Số điện thoại"
+              placeholder="0912345678"
+              value={createForm.phone}
+              onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Giới tính</label>
               <select
@@ -391,30 +564,6 @@ export const StudentsPage: React.FC = () => {
               onChange={(e) => setCreateForm({ ...createForm, dateOfBirth: e.target.value })}
               required
             />
-            <Input
-              label="CCCD / CMND"
-              placeholder="Số CCCD"
-              value={createForm.citizenId}
-              onChange={(e) => setCreateForm({ ...createForm, citizenId: e.target.value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Số điện thoại"
-              placeholder="0912345678"
-              value={createForm.phone}
-              onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
-              required
-            />
-            <Input
-              label="Email"
-              type="email"
-              placeholder="student@example.com"
-              value={createForm.email}
-              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-              required
-            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -425,14 +574,13 @@ export const StudentsPage: React.FC = () => {
                 onChange={(e) => setCreateForm({ ...createForm, faculty: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none bg-white text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               >
-                <option value="Công nghệ Thông tin">Công nghệ Thông tin</option>
-                <option value="Kinh tế & Quản trị">Kinh tế & Quản trị</option>
-                <option value="Điện tử Viễn thông">Điện tử Viễn thông</option>
-                <option value="Ngoại ngữ">Ngoại ngữ</option>
+                {faculties.map((f) => (
+                  <option key={f.name} value={f.name}>{f.name}</option>
+                ))}
               </select>
             </div>
             <Input
-              label="Lớp sinh hoạt"
+              label="Lớp sinh viên"
               placeholder="VD: CNTT-K18A"
               value={createForm.className}
               onChange={(e) => setCreateForm({ ...createForm, className: e.target.value })}
@@ -441,8 +589,8 @@ export const StudentsPage: React.FC = () => {
           </div>
 
           <Input
-            label="Địa chỉ thường trú"
-            placeholder="Huyện, Tỉnh..."
+            label="Địa chỉ quê quán / thường trú"
+            placeholder="Xã/Phường, Huyện/Quận, Tỉnh/TP..."
             value={createForm.address}
             onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
             required
@@ -457,7 +605,7 @@ export const StudentsPage: React.FC = () => {
               className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
             <label htmlFor="createAcc" className="text-xs text-slate-700 cursor-pointer">
-              Tự động cấp tài khoản đăng nhập (Mật khẩu mặc định: <span className="font-mono font-bold">Ktx@123456</span>)
+              Tự động cấp tài khoản đăng nhập cho sinh viên
             </label>
           </div>
 
@@ -623,6 +771,146 @@ export const StudentsPage: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Modal Quản lý Khoa / Viện */}
+      <Modal
+        isOpen={isFacultyModalOpen}
+        onClose={() => {
+          setIsFacultyModalOpen(false);
+          setEditingFaculty(null);
+          setFacultyMsg('');
+        }}
+        title="Quản Lý Danh Mục Khoa / Viện"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Quản lý các khoa đào tạo của trường. Bạn có thể thêm khoa mới, đổi tên khoa hoặc gộp 2 khoa thành 1 (hệ thống sẽ tự động cập nhật đồng bộ hồ sơ cho toàn bộ sinh viên đang học tại khoa đó).
+          </p>
+
+          {facultyMsg && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center justify-between">
+              <span>{facultyMsg}</span>
+              <button onClick={() => setFacultyMsg('')} className="text-emerald-600 hover:text-emerald-800">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Add New Faculty Bar */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <label className="text-xs font-semibold text-slate-700 block">Thêm khoa mới vào hệ thống</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="VD: Khoa Trí Tuệ Nhân Tạo, Khoa Y Dược..."
+                value={newFacultyName}
+                onChange={(e) => setNewFacultyName(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg outline-none bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+              />
+              <Button size="sm" icon={<Plus size={13} />} onClick={handleAddFaculty}>
+                Thêm khoa
+              </Button>
+            </div>
+          </div>
+
+          {/* Faculty List */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                <tr>
+                  <th className="px-3.5 py-2.5 text-left">Tên Khoa / Viện</th>
+                  <th className="px-3 py-2.5 text-center whitespace-nowrap">Số SV</th>
+                  <th className="px-3.5 py-2.5 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {faculties.map((f) => {
+                  const isEditing = editingFaculty?.oldName === f.name;
+
+                  return (
+                    <tr key={f.name} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-3.5 py-2.5 font-medium text-slate-800">
+                        {isEditing ? (
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={editingFaculty.newName}
+                              onChange={(e) =>
+                                setEditingFaculty({ ...editingFaculty, newName: e.target.value })
+                              }
+                              className="w-full px-2.5 py-1 text-xs border border-blue-400 rounded outline-none bg-white"
+                              autoFocus
+                            />
+                            <p className="text-[10px] text-blue-600">
+                              * Đổi tên khoa sẽ tự động cập nhật toàn bộ {f.count} sinh viên thuộc khoa này.
+                            </p>
+                          </div>
+                        ) : (
+                          <span>{f.name}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-mono">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                          {f.count} SV
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={handleRenameFaculty}
+                              disabled={facultyLoading}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              Lưu
+                            </button>
+                            <button
+                              onClick={() => setEditingFaculty(null)}
+                              className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[11px] hover:bg-slate-200"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setEditingFaculty({ oldName: f.name, newName: f.name })}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                              title="Đổi tên / Gộp khoa"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFaculty(f.name)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                              title="Xóa khoa này"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsFacultyModalOpen(false);
+                setEditingFaculty(null);
+                setFacultyMsg('');
+              }}
+            >
+              Đóng
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Confirm Delete */}
       <ConfirmDialog

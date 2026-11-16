@@ -167,10 +167,10 @@ export const ViolationsPage: React.FC = () => {
       render: (v: Violation) => (
         <Badge
           variant={
-            v.status === 3 ? 'success' : v.status === 2 ? 'warning' : 'danger'
+            v.status === 3 ? 'success' : 'danger'
           }
         >
-          {v.status === 3 ? 'Đã nộp phạt' : v.status === 2 ? 'Đang xử lý' : 'Chưa xử lý'}
+          {v.status === 3 ? 'Đã nộp phạt' : 'Chưa xử lý'}
         </Badge>
       ),
     },
@@ -237,7 +237,6 @@ export const ViolationsPage: React.FC = () => {
             >
               <option value="">Tất cả trạng thái</option>
               <option value="1">Chưa xử lý</option>
-              <option value="2">Đang xử lý</option>
               <option value="3">Đã nộp phạt</option>
             </select>
 
@@ -307,9 +306,8 @@ export const ViolationsPage: React.FC = () => {
             </div>
 
             <Input
-              label="Mức tiền phạt (VNĐ)"
-              type="number"
-              step={50000}
+              label="Mức tiền phạt"
+              isCurrency
               value={form.penaltyAmount}
               onChange={(e) => setForm({ ...form, penaltyAmount: Number(e.target.value) })}
               required

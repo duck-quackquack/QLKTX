@@ -5,6 +5,7 @@ import {
   getRepairById,
   createRepair,
   updateRepairStatus,
+  payRepairFee,
 } from '../controllers/repairController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -17,6 +18,7 @@ router.get('/', authorize('Admin', 'Staff'), getRepairs);
 router.get('/:id', getRepairById);
 router.post('/', createRepair);
 router.put('/:id/status', authorize('Admin', 'Staff'), updateRepairStatus);
+router.post('/:id/pay', payRepairFee);
 
 export default router;
 

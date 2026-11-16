@@ -30,6 +30,13 @@ export const RegistrationsPage: React.FC = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
   const [formErr, setFormErr] = useState('');
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    cancelled: 0,
+  });
 
   const fetchRegistrations = async () => {
     setLoading(true);
@@ -44,6 +51,9 @@ export const RegistrationsPage: React.FC = () => {
         setRegistrations(res.data.items);
         setTotalPages(res.data.totalPages);
         setTotalItems(res.data.totalItems);
+        if ((res.data as any).counts) {
+          setStatusCounts((res.data as any).counts);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -75,10 +85,14 @@ export const RegistrationsPage: React.FC = () => {
         const withAvailableBeds = res.data.items.filter((r) => r.availableCount > 0);
         setAvailableRooms(withAvailableBeds);
         if (withAvailableBeds.length > 0) {
-          setSelectedRoomId(withAvailableBeds[0].id);
-          const firstBed = withAvailableBeds[0].beds.find((b) => b.status === 1);
+          const preferredRoom = reg.preferredRoomId
+            ? withAvailableBeds.find((r) => r.id === reg.preferredRoomId)
+            : null;
+          const targetRoom = preferredRoom || withAvailableBeds[0];
+          setSelectedRoomId(targetRoom.id);
+          const firstBed = targetRoom.beds.find((b) => b.status === 1);
           setSelectedBedId(firstBed?.id || null);
-          setDepositAmount(withAvailableBeds[0].basePrice);
+          setDepositAmount(targetRoom.basePrice);
         }
       }
     } catch (err) {
@@ -122,12 +136,7 @@ export const RegistrationsPage: React.FC = () => {
     }
   };
 
-  const counts = {
-    all: totalItems,
-    pending: registrations.filter((r) => r.status === 1).length,
-    approved: registrations.filter((r) => r.status === 2).length,
-    rejected: registrations.filter((r) => r.status === 3).length,
-  };
+  const counts = statusCounts;
 
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
@@ -149,6 +158,7 @@ export const RegistrationsPage: React.FC = () => {
             { key: '1', label: 'Chờ duyệt', count: counts.pending, color: 'text-amber-700 bg-amber-100' },
             { key: '2', label: 'Đã duyệt', count: counts.approved, color: 'text-green-700 bg-green-100' },
             { key: '3', label: 'Từ chối', count: counts.rejected, color: 'text-red-700 bg-red-100' },
+            { key: '4', label: 'Đã hủy', count: counts.cancelled || 0, color: 'text-slate-600 bg-slate-100' },
           ].map((t) => (
             <button
               key={t.key}
@@ -210,8 +220,20 @@ export const RegistrationsPage: React.FC = () => {
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{r.studentCode}</td>
                     <td className="px-4 py-3 text-sm text-slate-500">{r.studentFaculty || '—'}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">
-                      {r.preferredBuildingName ? `Tòa ${r.preferredBuildingName}` : 'Tự do'} &bull;{' '}
-                      <span className="text-xs text-slate-400">{r.preferredRoomType || 'Loại phòng chuẩn'}</span>
+                      <div>
+                        {r.preferredBuildingName ? (r.preferredBuildingName.startsWith('Tòa') ? r.preferredBuildingName : `Tòa ${r.preferredBuildingName}`) : 'Tự do'} &bull;{' '}
+                        <span className="text-xs text-slate-400">{r.preferredRoomType || 'Loại phòng chuẩn'}</span>
+                      </div>
+                      {r.preferredRoomNumber && (
+                        <div className="text-[11px] font-semibold text-blue-600 mt-0.5">
+                          Nguyện vọng: {r.preferredRoomNumber.startsWith('P.') ? r.preferredRoomNumber : `P.${r.preferredRoomNumber}`}
+                        </div>
+                      )}
+                      {r.status === 2 && r.approvedRoomNumber && (
+                        <div className="text-[11px] font-semibold text-emerald-700 mt-0.5">
+                          Đã xếp: {r.approvedRoomNumber.startsWith('P.') ? r.approvedRoomNumber : `P.${r.approvedRoomNumber}`} ({r.approvedBedNumber})
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       {new Date(r.createdAt).toLocaleDateString('vi-VN')}
@@ -219,10 +241,22 @@ export const RegistrationsPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <Badge
                         variant={
-                          r.status === 2 ? 'success' : r.status === 3 ? 'danger' : 'warning'
+                          r.status === 2
+                            ? 'success'
+                            : r.status === 3
+                            ? 'danger'
+                            : r.status === 4
+                            ? 'default'
+                            : 'warning'
                         }
                       >
-                        {r.status === 2 ? 'Đã duyệt' : r.status === 3 ? 'Từ chối' : 'Chờ duyệt'}
+                        {r.status === 2
+                          ? 'Đã duyệt'
+                          : r.status === 3
+                          ? 'Từ chối'
+                          : r.status === 4
+                          ? 'Đã hủy'
+                          : 'Chờ duyệt'}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -323,8 +357,20 @@ export const RegistrationsPage: React.FC = () => {
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
               <p><span className="text-slate-400">Sinh viên:</span> <strong className="text-slate-800">{selectedReg.studentName} ({selectedReg.studentCode})</strong></p>
               <p><span className="text-slate-400">Khoa / Lớp:</span> <span className="text-slate-700">{selectedReg.studentFaculty || '—'} - {selectedReg.studentClassName || '—'}</span></p>
-              <p><span className="text-slate-400">Nguyện vọng:</span> <span className="text-blue-700 font-semibold">{selectedReg.preferredBuildingName ? `Tòa ${selectedReg.preferredBuildingName}` : 'Tùy chọn'} ({selectedReg.preferredRoomType})</span></p>
+              <p><span className="text-slate-400">Nguyện vọng tòa:</span> <span className="text-blue-700 font-semibold">{selectedReg.preferredBuildingName ? `Tòa ${selectedReg.preferredBuildingName}` : 'Tùy chọn'} ({selectedReg.preferredRoomType})</span></p>
+              {selectedReg.preferredRoomNumber && (
+                <p><span className="text-slate-400">Nguyện vọng phòng:</span> <strong className="text-blue-700 font-semibold">Phòng P.{selectedReg.preferredRoomNumber}</strong></p>
+              )}
             </div>
+
+            {selectedReg.preferredRoomNumber && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-center justify-between">
+                <span>Nguyện vọng đăng ký của sinh viên:</span>
+                <strong className="text-blue-900 font-semibold">
+                  Tòa {selectedReg.preferredBuildingName} &bull; Phòng P.{selectedReg.preferredRoomNumber} ({selectedReg.preferredRoomType})
+                </strong>
+              </div>
+            )}
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-600">Quyết định phê duyệt</label>
@@ -376,8 +422,8 @@ export const RegistrationsPage: React.FC = () => {
                 </div>
 
                 <Input
-                  label="Tiền cọc / Tiền phòng đợt 1 (VNĐ)"
-                  type="number"
+                  label="Tiền cọc / Tiền phòng đợt 1"
+                  isCurrency
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(Number(e.target.value))}
                 />
@@ -414,8 +460,15 @@ export const RegistrationsPage: React.FC = () => {
             <div className="p-3 bg-slate-50 rounded-lg space-y-1.5 text-slate-700">
               <p>Mã SV: <strong className="text-slate-900">{selectedReg.studentCode}</strong></p>
               <p>Họ và tên: <strong className="text-slate-900">{selectedReg.studentName}</strong></p>
+              <p>Giới tính: <strong>{selectedReg.studentGender || '—'}</strong></p>
               <p>Khoa: <strong>{selectedReg.studentFaculty || '—'}</strong> &bull; Lớp: <strong>{selectedReg.studentClassName || '—'}</strong></p>
               <p>Số điện thoại: <strong>{selectedReg.studentPhone || '—'}</strong></p>
+              <p>Tòa nhà nguyện vọng: <strong>{selectedReg.preferredBuildingName ? (selectedReg.preferredBuildingName.startsWith('Tòa') ? selectedReg.preferredBuildingName : `Tòa ${selectedReg.preferredBuildingName}`) : '—'}</strong> &bull; Loại: <strong>{selectedReg.preferredRoomType || '—'}</strong></p>
+              <p>Phòng nguyện vọng: <strong className="text-blue-700">{selectedReg.preferredRoomNumber ? `Phòng ${selectedReg.preferredRoomNumber.startsWith('P.') ? selectedReg.preferredRoomNumber : `P.${selectedReg.preferredRoomNumber}`}` : 'Để Ban Quản Lý tự động xếp phòng'}</strong></p>
+              {selectedReg.status === 2 && (
+                <p>Phòng & Giường đã duyệt: <strong className="text-emerald-700">Phòng {selectedReg.approvedRoomNumber?.startsWith('P.') ? selectedReg.approvedRoomNumber : `P.${selectedReg.approvedRoomNumber}`} &bull; Giường {selectedReg.approvedBedNumber}</strong></p>
+              )}
+              <p>Trạng thái đơn: <strong className={selectedReg.status === 2 ? 'text-emerald-700' : selectedReg.status === 3 ? 'text-rose-700' : selectedReg.status === 4 ? 'text-slate-600' : 'text-amber-700'}>{selectedReg.status === 2 ? 'Đã duyệt' : selectedReg.status === 3 ? 'Từ chối' : selectedReg.status === 4 ? 'Đã hủy' : 'Chờ duyệt'}</strong></p>
               <p>Ngày nộp: <strong>{new Date(selectedReg.createdAt).toLocaleString('vi-VN')}</strong></p>
             </div>
 

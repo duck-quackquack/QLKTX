@@ -7,13 +7,35 @@ import { Building } from '../models/Building.js';
 import { MeterReading } from '../models/MeterReading.js';
 import { Notification } from '../models/Notification.js';
 import { getNextSequence } from '../models/Counter.js';
+import { syncExpiredContracts } from './contractController.js';
+
+export const syncOverdueInvoices = async () => {
+  const now = new Date();
+  await Invoice.updateMany(
+    {
+      status: { $in: [1, 2] },
+      dueDate: { $lt: now },
+    },
+    {
+      $set: { status: 4 }, // 4: Overdue
+    }
+  );
+};
 
 export const getInvoices = async (req, res, next) => {
   try {
+    await syncOverdueInvoices();
     const { status, studentId, month, year, searchTerm, pageNumber = 1, pageSize = 10 } = req.query;
     const query = {};
 
-    if (status) query.status = Number(status);
+    if (status) {
+      const s = Number(status);
+      if (s === 4) {
+        query.$or = [{ status: 4 }, { status: { $in: [1, 2] }, dueDate: { $lt: new Date() } }];
+      } else {
+        query.status = s;
+      }
+    }
     if (studentId) query.studentId = Number(studentId);
     if (month) query.month = Number(month);
     if (year) query.year = Number(year);
@@ -94,6 +116,7 @@ export const getInvoices = async (req, res, next) => {
 
 export const getMyInvoices = async (req, res, next) => {
   try {
+    await syncOverdueInvoices();
     const student = await Student.findOne({ userId: req.user.id });
     if (!student) {
       return res.json({ success: true, data: [] });
@@ -141,9 +164,18 @@ export const getMyInvoices = async (req, res, next) => {
 
 export const getInvoiceById = async (req, res, next) => {
   try {
-    const inv = await Invoice.findOne({ id: Number(req.params.id) }).lean();
+    const invId = Number(req.params.id);
+    if (isNaN(invId)) {
+      return res.status(404).json({ success: false, message: 'Mã hóa đơn không hợp lệ.' });
+    }
+    const inv = await Invoice.findOne({ id: invId }).lean();
     if (!inv) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn.' });
+    }
+
+    // IDOR protection: Student can only view their own invoice
+    if (req.user.role === 'Student' && inv.studentId !== req.user.studentId) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem hóa đơn này.' });
     }
 
     const student = await Student.findOne({ id: inv.studentId }).lean();
@@ -188,6 +220,24 @@ export const createInvoice = async (req, res, next) => {
       notes,
     } = req.body;
 
+    const m = Number(month);
+    const y = Number(year);
+    const cId = Number(contractId);
+    const sId = Number(studentId);
+
+    if (!cId || !sId || !m || !y) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin sinh viên, hợp đồng và kỳ hóa đơn.' });
+    }
+
+    // Rule 3.6: Prevent duplicate invoice for same contract and period
+    const existing = await Invoice.findOne({ contractId: cId, month: m, year: y });
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: `Hóa đơn kỳ ${m}/${y} cho hợp đồng này đã tồn tại (${existing.invoiceCode}). Không thể tạo trùng.`,
+      });
+    }
+
     const rFee = Number(roomFee) || 0;
     const eFee = Number(electricityFee) || 0;
     const wFee = Number(waterFee) || 0;
@@ -196,15 +246,19 @@ export const createInvoice = async (req, res, next) => {
     const totalAmount = rFee + eFee + wFee + sFee + oFee;
 
     const id = await getNextSequence('invoice_id');
-    const invoiceCode = `INV-${year}${String(month).padStart(2, '0')}-${String(studentId).padStart(4, '0')}`;
+    let invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(sId).padStart(4, '0')}`;
+    const duplicateCode = await Invoice.findOne({ invoiceCode });
+    if (duplicateCode) {
+      invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(sId).padStart(4, '0')}-${String(id).padStart(3, '0')}`;
+    }
 
     const invoice = await Invoice.create({
       id,
       invoiceCode,
-      studentId: Number(studentId),
-      contractId: Number(contractId),
-      month: Number(month),
-      year: Number(year),
+      studentId: sId,
+      contractId: cId,
+      month: m,
+      year: y,
       roomFee: rFee,
       electricityFee: eFee,
       waterFee: wFee,
@@ -226,19 +280,19 @@ export const createInvoice = async (req, res, next) => {
 
 export const generateMonthlyInvoices = async (req, res, next) => {
   try {
-    const { month, year, dueDate, serviceFeePerPerson = 30000 } = req.body;
+    await syncExpiredContracts();
+
+    const { month, year, dueDate, serviceFeePerPerson = 30000, serviceFee } = req.body;
     const m = Number(month);
     const y = Number(year);
-    const sFee = Number(serviceFeePerPerson) || 30000;
+    const sFee = Number(serviceFee || serviceFeePerPerson) || 30000;
     const due = dueDate ? new Date(dueDate) : new Date(y, m - 1, 28);
 
-    const activeContracts = await Contract.find({ status: 1 }).lean();
+    // Query active contracts with status 2
+    const activeContracts = await Contract.find({ status: 2 }).lean();
     let generatedCount = 0;
 
     for (const contract of activeContracts) {
-      const existing = await Invoice.findOne({ contractId: contract.id, month: m, year: y });
-      if (existing) continue;
-
       const reading = await MeterReading.findOne({ roomId: contract.roomId, month: m, year: y }).lean();
       const roomContracts = activeContracts.filter((c) => c.roomId === contract.roomId);
       const studentCountInRoom = Math.max(1, roomContracts.length);
@@ -252,9 +306,34 @@ export const generateMonthlyInvoices = async (req, res, next) => {
         waterFee = Math.round((waterUsage * (reading.waterUnitPrice || 15000)) / studentCountInRoom);
       }
 
+      const existing = await Invoice.findOne({ contractId: contract.id, month: m, year: y });
+      if (existing) {
+        // Automatically supplement or update electricity, water, and service fees into existing invoice
+        existing.electricityFee = elecFee;
+        existing.waterFee = waterFee;
+        existing.serviceFee = sFee;
+        const newTotal = (existing.roomFee || contract.monthlyRent) + elecFee + waterFee + sFee + (existing.otherFee || 0);
+        existing.totalAmount = newTotal;
+        if (due) {
+          existing.dueDate = due;
+        }
+        if ((existing.paidAmount || 0) >= newTotal) {
+          existing.status = 3; // Fully paid
+        } else {
+          existing.status = 1; // Unpaid / Incomplete
+        }
+        await existing.save();
+        generatedCount++;
+        continue;
+      }
+
       const total = contract.monthlyRent + elecFee + waterFee + sFee;
       const id = await getNextSequence('invoice_id');
-      const invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(contract.studentId).padStart(4, '0')}`;
+      let invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(contract.studentId).padStart(4, '0')}`;
+      const duplicateCode = await Invoice.findOne({ invoiceCode });
+      if (duplicateCode) {
+        invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(contract.studentId).padStart(4, '0')}-${String(id).padStart(3, '0')}`;
+      }
 
       await Invoice.create({
         id,
@@ -308,7 +387,11 @@ export const cancelInvoice = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn.' });
     }
 
-    inv.status = 4; // Cancelled
+    if (inv.status === 3) {
+      return res.status(400).json({ success: false, message: 'Hóa đơn đã được thanh toán hoàn tất, không thể hủy.' });
+    }
+
+    inv.status = 5; // 5: Cancelled
     inv.notes = reason ? `Hủy: ${reason}` : 'Hóa đơn đã bị hủy bởi quản trị viên.';
     await inv.save();
 

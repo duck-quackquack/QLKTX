@@ -28,6 +28,7 @@ export const ProfilePage: React.FC = () => {
     fullName: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
+    studentCode: user?.studentCode || '',
     avatarUrl: user?.avatarUrl || '',
   });
 
@@ -43,6 +44,54 @@ export const ProfilePage: React.FC = () => {
   const [passwordErr, setPasswordErr] = useState('');
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
+
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [socialMsg, setSocialMsg] = useState('');
+
+  const handleLinkFacebook = () => {
+    setSocialMsg('');
+    setSocialLoading(true);
+
+    if (typeof window !== 'undefined' && (window as any).FB) {
+      (window as any).FB.login(
+        (response: any) => {
+          if (response.authResponse) {
+            authApi
+              .linkSocial({
+                provider: 'facebook',
+                providerId: response.authResponse.userID,
+              })
+              .then((res) => {
+                if (res.success) {
+                  if (res.data?.user) updateCurrentUser(res.data.user);
+                  setSocialMsg('Đã liên kết tài khoản Facebook thành công! Bạn có thể dùng Facebook đăng nhập thẳng vào đây.');
+                }
+              })
+              .catch((err) => {
+                alert(err.response?.data?.message || err.message || 'Liên kết thất bại');
+              })
+              .finally(() => setSocialLoading(false));
+          } else {
+            setSocialLoading(false);
+          }
+        },
+        { scope: 'public_profile' }
+      );
+    } else {
+      authApi
+        .linkSocial({
+          provider: 'facebook',
+          providerId: 'fb_' + (user?.id || 'demo'),
+        })
+        .then((res) => {
+          if (res.success) {
+            if (res.data?.user) updateCurrentUser(res.data.user);
+            setSocialMsg('Đã liên kết tài khoản Facebook thành công!');
+          }
+        })
+        .finally(() => setSocialLoading(false));
+    }
+  };
 
   // Notification settings state
   const [notifSettings, setNotifSettings] = useState([
@@ -223,14 +272,21 @@ export const ProfilePage: React.FC = () => {
                     disabled
                     className="bg-slate-50 text-slate-500"
                   />
-                  {user?.studentCode && (
+                  {user?.role === 3 ? (
+                    <Input
+                      label="Mã số sinh viên"
+                      value={profileForm.studentCode}
+                      onChange={(e) => setProfileForm({ ...profileForm, studentCode: e.target.value })}
+                      placeholder="VD: 1822041524"
+                    />
+                  ) : user?.studentCode ? (
                     <Input
                       label="Mã số sinh viên"
                       value={user.studentCode}
                       disabled
                       className="bg-slate-50 text-slate-500"
                     />
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="flex justify-end pt-2">
@@ -240,6 +296,78 @@ export const ProfilePage: React.FC = () => {
                 </div>
               </form>
             </div>
+
+            {/* Social Accounts Linking Card (Chỉ dành riêng cho sinh viên) */}
+            {user?.role === 3 && (
+              <div className="lg:col-span-3 bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="text-sm font-semibold text-slate-800 mb-1">Liên kết tài khoản mạng xã hội</h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Gắn kết tài khoản Google hoặc Facebook để đăng nhập 1 chạm vào đúng tài khoản KTX này.
+                </p>
+
+                {socialMsg && (
+                  <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-xs font-semibold text-green-700 flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-green-600" />
+                    {socialMsg}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Google Box */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-bold text-red-500 shadow-xs">
+                        G
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Tài khoản Google</p>
+                        <p className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                          {user?.googleId ? user?.email : 'Chưa liên kết Google'}
+                        </p>
+                      </div>
+                    </div>
+                    {user?.googleId ? (
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                        ✓ Đã liên kết
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full bg-slate-200/80 text-slate-600 text-[10px] font-medium">
+                        Chưa liên kết
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Facebook Box */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                        f
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">Tài khoản Facebook</p>
+                        <p className="text-[11px] text-slate-500 truncate max-w-[150px]">
+                          {user?.facebookId ? `Đã liên kết (ID: ${user.facebookId})` : 'Chưa liên kết Facebook'}
+                        </p>
+                      </div>
+                    </div>
+                    {user?.facebookId ? (
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                        ✓ Đã liên kết
+                      </span>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleLinkFacebook}
+                        loading={socialLoading}
+                      >
+                        Liên kết ngay
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

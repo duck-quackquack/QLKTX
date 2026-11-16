@@ -15,7 +15,11 @@ import {
   FileText,
   CreditCard,
   Building2,
-  BedDouble
+  BedDouble,
+  QrCode,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
@@ -59,48 +63,147 @@ export const StudentDashboardPage: React.FC = () => {
   const unreadNotifs = notifications.filter((n) => !n.isRead);
   const processingRepairs = repairs.filter((r) => r.status === 2 || r.status === 1);
 
+  const studentIdentifier = user?.studentCode || user?.username || 'SV';
+  const lanHost = window.location.hostname === 'localhost' ? '192.168.1.203' : window.location.hostname;
+  const passUrl = `${window.location.protocol}//${lanHost}:${window.location.port || '3000'}/verify-pass?code=${encodeURIComponent(studentIdentifier)}`;
+
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
       <Header
         title="Trang chủ sinh viên"
-        subtitle="Tổng quan phòng ở, công nợ và thông tin ký túc xá"
+        subtitle="Tổng quan phòng ở, thẻ nội trú điện tử và công nợ ký túc xá"
       />
 
-      <div className="max-w-7xl mx-auto px-6 mt-6 flex flex-col gap-6">
-        {/* Welcome Card Banner */}
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white relative overflow-hidden shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 flex flex-col gap-6">
+        {/* Digital Dorm ID Card (Thẻ Nội Trú Điện Tử) */}
+        <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl border border-blue-900/30">
           <div
-            className="absolute right-0 top-0 w-64 h-64 opacity-10 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, white, transparent)' }}
+            className="absolute right-0 top-0 w-96 h-96 opacity-15 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, #3b82f6, transparent)' }}
           />
-          <div className="relative">
-            <div className="flex items-center gap-3.5 mb-5">
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg shadow-inner">
-                {user?.fullName?.split(' ').pop()?.charAt(0) || user?.username?.charAt(0) || 'S'}
+
+          {/* Card Top Meta */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-white/10 relative z-10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <h1 className="text-xl font-bold leading-tight">Xin chào, {user?.fullName || user?.username}</h1>
-                <p className="text-blue-200 text-sm mt-0.5">
-                  {user?.studentCode ? `${user.studentCode} · ` : ''}{user?.email || 'Sinh viên nội trú'}
+                <p className="text-[11px] font-bold tracking-wider uppercase text-blue-300">
+                  Thẻ Nội Trú Điện Tử · Digital Resident Pass
                 </p>
+                <p className="text-[10px] text-slate-400">Hệ Thống Quản Lý Ký Túc Xá Sinh Viên</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: 'Tòa nhà', value: activeContract ? `Tòa ${activeContract.buildingName}` : 'Chưa xếp phòng' },
-                { label: 'Phòng', value: activeContract ? `P.${activeContract.roomNumber}` : '—' },
-                { label: 'Giường', value: activeContract ? `Giường ${activeContract.bedNumber}` : '—' },
-                {
-                  label: 'Trạng thái',
-                  value: activeContract ? 'Đang nội trú' : 'Chưa đăng ký',
-                },
-              ].map((i) => (
-                <div key={i.label} className="bg-white/10 rounded-xl p-3.5 backdrop-blur-sm border border-white/10">
-                  <p className="text-blue-200 text-xs mb-1 font-medium">{i.label}</p>
-                  <p className="font-semibold text-sm">{i.value}</p>
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border ${
+                  activeContract
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    activeContract ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                  }`}
+                />
+                {activeContract ? 'Đang Lưu Trú Hợp Lệ' : 'Chưa Đăng Ký Phòng'}
+              </span>
+            </div>
+          </div>
+
+          {/* Card Main Info */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6 relative z-10 items-center">
+            {/* Student Info */}
+            <div className="lg:col-span-2 space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="relative shrink-0">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 text-white font-extrabold text-2xl sm:text-3xl flex items-center justify-center shadow-lg shadow-blue-500/25 border-2 border-white/20">
+                    {user?.fullName?.split(' ').pop()?.charAt(0) || user?.username?.charAt(0) || 'S'}
+                  </div>
+                  {activeContract && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center border-2 border-slate-900 shadow">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    </div>
+                  )}
                 </div>
-              ))}
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white truncate">
+                    {user?.fullName || user?.username}
+                  </h1>
+                  <p className="text-blue-300 font-mono text-xs sm:text-sm mt-0.5 font-semibold">
+                    MSSV: {user?.studentCode || 'Chưa cập nhật'}
+                  </p>
+                  <p className="text-slate-400 text-xs mt-1 truncate">
+                    {user?.email || ''} {user?.phone ? `· ${user.phone}` : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* Resident Metadata Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10 backdrop-blur-xs">
+                  <p className="text-slate-400 text-[11px] mb-0.5">Tòa nhà</p>
+                  <p className="font-bold text-sm text-white truncate">
+                    {activeContract
+                      ? (activeContract.buildingName?.startsWith('Tòa')
+                          ? activeContract.buildingName
+                          : `Tòa ${activeContract.buildingName}`)
+                      : '—'}
+                  </p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10 backdrop-blur-xs">
+                  <p className="text-slate-400 text-[11px] mb-0.5">Phòng ở</p>
+                  <p className="font-bold text-sm text-blue-300">
+                    {activeContract ? `Phòng ${activeContract.roomNumber}` : '—'}
+                  </p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10 backdrop-blur-xs">
+                  <p className="text-slate-400 text-[11px] mb-0.5">Vị trí giường</p>
+                  <p className="font-bold text-sm text-white">
+                    {activeContract ? `Giường số ${activeContract.bedNumber}` : '—'}
+                  </p>
+                </div>
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10 backdrop-blur-xs">
+                  <p className="text-slate-400 text-[11px] mb-0.5">Mã hợp đồng</p>
+                  <p className="font-bold text-xs sm:text-sm text-emerald-400 truncate">
+                    {activeContract ? activeContract.contractNumber : 'Chưa có'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* QR Pass Box */}
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 flex flex-col items-center text-center">
+              <a
+                href={passUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Bấm để mở thẻ nội trú điện tử trên web"
+                className="bg-white p-2.5 rounded-xl shadow-md mb-2.5 hover:scale-105 transition-transform block group cursor-pointer"
+              >
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(passUrl)}`}
+                  alt="QR Code Thẻ Nội Trú KTX"
+                  className="w-24 h-24 sm:w-28 sm:h-28 object-contain"
+                />
+              </a>
+              <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                <QrCode className="w-3.5 h-3.5 text-blue-400" />
+                Mã QR Thẻ Nội Trú
+              </p>
+              <p className="text-[10px] text-slate-300 mt-0.5 font-mono">
+                PASS: QLKTX-{studentIdentifier}
+              </p>
+              <Link
+                to={`/verify-pass?code=${encodeURIComponent(studentIdentifier)}`}
+                className="mt-2.5 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600/90 hover:bg-blue-600 text-white text-[11px] font-bold transition shadow-xs hover:shadow-md"
+              >
+                <span>Mở thẻ điện tử</span>
+                <ChevronRight size={13} />
+              </Link>
             </div>
           </div>
         </div>

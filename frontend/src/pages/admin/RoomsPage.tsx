@@ -20,9 +20,13 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+import { useAuth } from '../../contexts/AuthContext';
+
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
 export const RoomsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 1;
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
@@ -95,6 +99,14 @@ export const RoomsPage: React.FC = () => {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErr('');
+
+    const currentB = buildings.find((b) => b.id === (selectedBuildingId || form.buildingId));
+    const maxFloors = currentB?.numberOfFloors || currentB?.totalFloors || 4;
+    if (form.floor < 1 || form.floor > maxFloors) {
+      setFormErr(`Số tầng không hợp lệ. Tòa nhà ${currentB?.name || ''} chỉ có tối đa ${maxFloors} tầng (bạn đã nhập ${form.floor}).`);
+      return;
+    }
+
     setActionLoading(true);
 
     try {
@@ -130,6 +142,14 @@ export const RoomsPage: React.FC = () => {
     e.preventDefault();
     if (!selectedRoom) return;
     setFormErr('');
+
+    const editB = buildings.find((b) => b.id === selectedRoom.buildingId);
+    const maxFloors = editB?.numberOfFloors || editB?.totalFloors || 4;
+    if (selectedRoom.floor < 1 || selectedRoom.floor > maxFloors) {
+      setFormErr(`Số tầng không hợp lệ. Tòa nhà ${editB?.name || ''} chỉ có tối đa ${maxFloors} tầng (bạn đã nhập ${selectedRoom.floor}).`);
+      return;
+    }
+
     setActionLoading(true);
 
     try {
@@ -181,6 +201,8 @@ export const RoomsPage: React.FC = () => {
     }
   };
 
+  const currentBuilding = buildings.find((b) => b.id === (selectedBuildingId || form.buildingId));
+
   const filtered = rooms.filter((r) => {
     const matchesSearch = !search || r.roomNumber.toLowerCase().includes(search.toLowerCase());
     const matchesStatus =
@@ -204,9 +226,11 @@ export const RoomsPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-800">Quản lý Phòng ở</h1>
             <p className="text-sm text-slate-500 mt-0.5">Danh sách phòng & giường ký túc xá</p>
           </div>
-          <Button icon={<Plus size={15} />} onClick={() => setIsCreateOpen(true)}>
-            Thêm phòng
-          </Button>
+          {isAdmin && (
+            <Button icon={<Plus size={15} />} onClick={() => setIsCreateOpen(true)}>
+              Thêm phòng
+            </Button>
+          )}
         </div>
 
         {/* Building selector & Filters Container */}
@@ -299,10 +323,10 @@ export const RoomsPage: React.FC = () => {
                         <td className="px-4 py-3">
                           <Badge
                             variant={
-                              r.status === 1 ? 'success' : r.status === 2 ? 'info' : 'warning'
+                              r.status === 3 ? 'warning' : (r.occupiedCount >= r.capacity || r.availableCount === 0 || r.status === 2) ? 'info' : 'success'
                             }
                           >
-                            {r.status === 1 ? 'Còn chỗ' : r.status === 2 ? 'Đầy' : 'Bảo trì'}
+                            {r.status === 3 ? 'Bảo trì' : (r.occupiedCount >= r.capacity || r.availableCount === 0 || r.status === 2) ? 'Đầy' : 'Còn chỗ'}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -327,16 +351,18 @@ export const RoomsPage: React.FC = () => {
                             >
                               <Edit2 size={14} />
                             </button>
-                            <button
-                              onClick={() => {
-                                setSelectedRoom(r);
-                                setShowDelete(true);
-                              }}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              title="Xóa"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setSelectedRoom(r);
+                                  setShowDelete(true);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Xóa"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -359,8 +385,8 @@ export const RoomsPage: React.FC = () => {
             <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {filtered.map((r) => {
                 const pct = Math.round((r.occupiedCount / r.capacity) * 100);
-                const isFull = r.occupiedCount >= r.capacity || r.status === 2;
                 const isMaint = r.status === 3;
+                const isFull = !isMaint && (r.occupiedCount >= r.capacity || r.availableCount === 0 || r.status === 2);
 
                 return (
                   <div
@@ -424,8 +450,14 @@ export const RoomsPage: React.FC = () => {
               label="Tầng"
               type="number"
               min={1}
+              max={currentBuilding?.numberOfFloors || currentBuilding?.totalFloors || 4}
+              helperText={currentBuilding ? `Tối đa ${currentBuilding.numberOfFloors || currentBuilding.totalFloors || 4} tầng (${currentBuilding.name})` : undefined}
               value={form.floor}
-              onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                const maxF = currentBuilding?.numberOfFloors || currentBuilding?.totalFloors || 4;
+                setForm({ ...form, floor: val > maxF ? maxF : val });
+              }}
               required
             />
           </div>
@@ -450,8 +482,8 @@ export const RoomsPage: React.FC = () => {
             </div>
 
             <Input
-              label="Giá thuê/người/tháng (VNĐ)"
-              type="number"
+              label="Giá thuê/người/tháng"
+              isCurrency
               value={form.basePrice}
               onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) })}
               required
@@ -496,16 +528,22 @@ export const RoomsPage: React.FC = () => {
                 label="Tầng"
                 type="number"
                 min={1}
+                max={buildings.find((b) => b.id === selectedRoom.buildingId)?.numberOfFloors || 4}
+                helperText={`Tối đa ${buildings.find((b) => b.id === selectedRoom.buildingId)?.numberOfFloors || 4} tầng`}
                 value={selectedRoom.floor}
-                onChange={(e) => setSelectedRoom({ ...selectedRoom, floor: Number(e.target.value) })}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  const maxF = buildings.find((b) => b.id === selectedRoom.buildingId)?.numberOfFloors || 4;
+                  setSelectedRoom({ ...selectedRoom, floor: val > maxF ? maxF : val });
+                }}
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Giá thuê (VNĐ)"
-                type="number"
+                label="Giá thuê"
+                isCurrency
                 value={selectedRoom.basePrice}
                 onChange={(e) => setSelectedRoom({ ...selectedRoom, basePrice: Number(e.target.value) })}
                 required

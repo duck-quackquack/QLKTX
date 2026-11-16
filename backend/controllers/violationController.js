@@ -1,6 +1,7 @@
 import { Violation } from '../models/Violation.js';
 import { Student } from '../models/Student.js';
 import { Notification } from '../models/Notification.js';
+import { Payment } from '../models/Payment.js';
 import { getNextSequence } from '../models/Counter.js';
 
 export const getViolations = async (req, res, next) => {
@@ -89,6 +90,11 @@ export const getViolationById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin vi phạm.' });
     }
 
+    // IDOR protection: Student can only view their own violation
+    if (req.user.role === 'Student' && violation.studentId !== req.user.studentId) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem thông tin vi phạm này.' });
+    }
+
     const student = await Student.findOne({ id: violation.studentId }).lean();
 
     res.json({
@@ -172,6 +178,61 @@ export const updateViolationStatus = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Cập nhật trạng thái vi phạm thành công',
+      data: {
+        ...violation.toObject(),
+        studentName: student?.fullName || '',
+        studentCode: student?.studentCode || '',
+        studentPhone: student?.phone || '',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const payViolation = async (req, res, next) => {
+  try {
+    const { transactionCode, notes } = req.body;
+    const violation = await Violation.findOne({ id: Number(req.params.id) });
+
+    if (!violation) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin vi phạm.' });
+    }
+
+    // IDOR protection: Student can only pay their own violation
+    if (req.user.role === 'Student' && violation.studentId !== req.user.studentId) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền nộp phạt cho biên bản này.' });
+    }
+
+    if (violation.status === 3) {
+      return res.status(400).json({ success: false, message: 'Biên bản này đã được nộp phạt / giải quyết trước đó.' });
+    }
+
+    violation.status = 3; // Processed / Paid
+    violation.resolutionNotes = notes || `Sinh viên nộp phạt trực tuyến VietQR (Mã GD: ${transactionCode || 'N/A'})`;
+    await violation.save();
+
+    if (violation.penaltyAmount > 0) {
+      const paymentId = await getNextSequence('payment_id');
+      await Payment.create({
+        id: paymentId,
+        studentId: violation.studentId,
+        paymentCode: `PAY-VP${Date.now().toString().slice(-6)}-${String(paymentId).padStart(4, '0')}`,
+        amount: violation.penaltyAmount,
+        paymentDate: new Date(),
+        paymentMethod: 2,
+        transactionCode: transactionCode?.trim() || `VP${violation.id}-${Date.now().toString().slice(-4)}`,
+        status: 2,
+        notes: `Nộp phạt vi phạm #${violation.id}: ${violation.title}`,
+        receivedBy: 'Ban Quản Trị KTX (VietQR)',
+      });
+    }
+
+    const student = await Student.findOne({ id: violation.studentId }).lean();
+
+    res.json({
+      success: true,
+      message: 'Nộp phạt vi phạm thành công',
       data: {
         ...violation.toObject(),
         studentName: student?.fullName || '',

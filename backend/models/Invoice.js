@@ -17,7 +17,7 @@ const invoiceSchema = new mongoose.Schema(
     totalAmount: { type: Number, required: true },
     paidAmount: { type: Number, default: 0 },
     dueDate: { type: Date, required: true },
-    status: { type: Number, default: 1 }, // 1: Unpaid, 2: PartiallyPaid, 3: Paid, 4: Cancelled, 5: Overdue
+    status: { type: Number, default: 1 }, // 1: Unpaid, 2: PartiallyPaid, 3: Paid, 4: Overdue, 5: Cancelled
     notes: { type: String, default: null },
   },
   {

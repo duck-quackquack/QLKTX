@@ -25,6 +25,9 @@ export interface User {
   role: UserRole;
   studentId?: number;
   studentCode?: string;
+  studentGender?: string;
+  facebookId?: string;
+  googleId?: string;
 }
 
 export interface AuthResponse {
@@ -62,12 +65,28 @@ export interface Building {
   name: string;
   address: string;
   numberOfFloors: number;
+  totalFloors?: number;
   description?: string;
   genderAllowed?: string;
   totalRooms: number;
+  roomCount?: number;
   totalBeds: number;
   occupiedBeds: number;
   availableBeds: number;
+}
+
+export interface BankAccount {
+  id: number;
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  branch?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Bed {
@@ -102,6 +121,7 @@ export interface Room {
 
 export interface Registration {
   id: number;
+  registrationCode?: string;
   studentId: number;
   studentName: string;
   studentCode: string;
@@ -112,6 +132,8 @@ export interface Registration {
   preferredBuildingId?: number;
   preferredBuildingName?: string;
   preferredRoomType?: string;
+  preferredRoomId?: number;
+  preferredRoomNumber?: string;
   desiredStartDate: string;
   durationMonths: number;
   reasonOrNote?: string;
@@ -165,6 +187,9 @@ export interface MeterReading {
   waterUsage: number;
   totalElectricityCost: number;
   totalWaterCost: number;
+  electricityAmount?: number;
+  waterAmount?: number;
+  totalAmount?: number;
   recordedDate: string;
   recordedBy?: string;
 }
@@ -209,6 +234,9 @@ export interface Payment {
   status: 1 | 2 | 3; // 1: Pending, 2: Completed, 3: Failed
   notes?: string;
   receivedBy?: string;
+  studentName?: string;
+  studentCode?: string;
+  roomNumber?: string;
 }
 
 export interface Violation {
@@ -243,6 +271,9 @@ export interface RepairRequest {
   priority: 1 | 2 | 3 | 4; // 1: Low, 2: Medium, 3: High, 4: Urgent
   status: 1 | 2 | 3 | 4; // 1: Pending, 2: Processing, 3: Completed, 4: Cancelled
   repairCost: number;
+  isPaid?: boolean;
+  paidAt?: string;
+  paymentTransactionCode?: string;
   staffNotes?: string;
   completedAt?: string;
   createdAt: string;

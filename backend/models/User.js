@@ -9,6 +9,8 @@ const userSchema = new mongoose.Schema(
     fullName: { type: String, required: true, trim: true },
     phone: { type: String, default: null },
     avatarUrl: { type: String, default: null },
+    facebookId: { type: String, default: null },
+    googleId: { type: String, default: null },
     role: { type: Number, default: 3 }, // 1: Admin, 2: Staff, 3: Student
     isActive: { type: Boolean, default: true },
     refreshToken: { type: String, default: null },

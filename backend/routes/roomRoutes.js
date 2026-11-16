@@ -22,11 +22,11 @@ router.get('/building/:buildingId', getRoomsByBuilding);
 router.get('/:id', getRoomById);
 router.get('/', getRooms);
 
-router.post('/', authorize(1, 2), createRoom);
+router.post('/', authorize(1), createRoom);
 router.put('/:id', authorize(1, 2), updateRoom);
 router.delete('/:id', authorize(1), deleteRoom);
 
-router.post('/:roomId/beds', authorize(1, 2), addBed);
+router.post('/:roomId/beds', authorize(1), addBed);
 router.put('/beds/:bedId/status', authorize(1, 2), updateBedStatus);
 router.delete('/beds/:bedId', authorize(1), deleteBed);
 

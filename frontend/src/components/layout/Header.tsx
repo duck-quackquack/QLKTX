@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Search, User as UserIcon, LogOut, ChevronDown, UserCircle, Settings } from 'lucide-react';
+import { Bell, Search, User as UserIcon, LogOut, ChevronDown, UserCircle, Settings, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 import { notificationApi } from '../../api';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -41,31 +42,72 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, breadcrumb }) =
     }
   };
 
-  const profilePath = user?.role === 3 ? '/student/profile' : '/admin/profile';
-  const roleLabel = user?.role === 1 ? 'Quản trị viên' : user?.role === 2 ? 'Nhân viên KTX' : 'Sinh viên';
+  if (user?.role === 3) {
+    return (
+      <div className="bg-white border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 shadow-2xs">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="min-w-0">
+            {breadcrumb && breadcrumb.length > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1 truncate">
+                {breadcrumb.map((b, idx) => (
+                  <React.Fragment key={idx}>
+                    {idx > 0 && <span>/</span>}
+                    {b.path ? (
+                      <Link to={b.path} className="hover:text-blue-600 transition truncate">
+                        {b.label}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-600 font-medium truncate">{b.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight">{title}</h1>
+            {subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const profilePath = '/admin/profile';
+  const roleLabel = user?.role === 1 ? 'Quản trị viên' : 'Nhân viên KTX';
+  const { toggleMobile } = useSidebar();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-      {/* Title & Breadcrumb */}
-      <div>
-        {breadcrumb && breadcrumb.length > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
-            {breadcrumb.map((b, idx) => (
-              <React.Fragment key={idx}>
-                {idx > 0 && <span>/</span>}
-                {b.path ? (
-                  <Link to={b.path} className="hover:text-blue-600 transition">
-                    {b.label}
-                  </Link>
-                ) : (
-                  <span className="text-slate-600 font-medium">{b.label}</span>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        <h2 className="text-lg font-bold text-slate-900 leading-tight">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+      {/* Mobile Hamburger + Title & Breadcrumb */}
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={toggleMobile}
+          className="lg:hidden p-2 -ml-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+          title="Mở menu"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="min-w-0">
+          {breadcrumb && breadcrumb.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5 truncate">
+              {breadcrumb.map((b, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <span>/</span>}
+                  {b.path ? (
+                    <Link to={b.path} className="hover:text-blue-600 transition truncate">
+                      {b.label}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-600 font-medium truncate">{b.label}</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight truncate">{title}</h2>
+          {subtitle && <p className="text-[11px] sm:text-xs text-slate-500 truncate hidden sm:block">{subtitle}</p>}
+        </div>
       </div>
 
       {/* Right Controls */}
@@ -85,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, breadcrumb }) =
 
         {/* Notification Bell */}
         <Link
-          to={user?.role === 3 ? '/student/notifications' : '/admin/notifications'}
+          to="/admin/notifications"
           className="relative w-9 h-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition"
           title="Thông báo"
         >

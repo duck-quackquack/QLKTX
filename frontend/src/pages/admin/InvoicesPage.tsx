@@ -15,7 +15,8 @@ import {
   Zap,
   Droplets,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 
 const fmt = (n?: number | null) => new Intl.NumberFormat('vi-VN').format(n || 0);
@@ -196,9 +197,8 @@ export const InvoicesPage: React.FC = () => {
               className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none bg-white text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="3">Đã thanh toán đủ</option>
+              <option value="3">Đã thanh toán</option>
               <option value="1">Chưa thanh toán</option>
-              <option value="2">Thanh toán một phần</option>
               <option value="4">Quá hạn</option>
             </select>
 
@@ -210,8 +210,8 @@ export const InvoicesPage: React.FC = () => {
             <table className="w-full data-table">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {['Mã HĐ', 'Sinh viên', 'Phòng', 'Kỳ thu', 'Tiền phòng', 'Điện', 'Nước', 'Dịch vụ', 'Tổng cộng', 'Đã TT', 'Còn lại', 'Hạn TT', 'Trạng thái', ''].map((h) => (
-                    <th key={h} className="px-3 py-3 text-left whitespace-nowrap">{h}</th>
+                  {['Mã HĐ', 'Sinh viên', 'Phòng', 'Kỳ thu', 'Tổng cộng', 'Đã TT', 'Còn lại', 'Hạn TT', 'Trạng thái', ''].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -221,37 +221,33 @@ export const InvoicesPage: React.FC = () => {
 
                   return (
                     <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-3 py-3 font-mono text-xs font-semibold text-blue-600">{inv.invoiceCode}</td>
-                      <td className="px-3 py-3 text-sm font-semibold text-slate-800 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-mono text-xs font-semibold text-blue-600">{inv.invoiceCode}</td>
+                      <td className="px-4 py-3.5 text-sm font-semibold text-slate-800 whitespace-nowrap">
                         {inv.studentName}
                         <span className="block text-[11px] font-normal text-slate-400">{inv.studentCode}</span>
                       </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">P.{inv.roomNumber}</td>
-                      <td className="px-3 py-3 text-sm font-mono text-slate-600">
+                      <td className="px-4 py-3.5 text-sm text-slate-600 font-medium">P.{inv.roomNumber}</td>
+                      <td className="px-4 py-3.5 text-sm font-mono text-slate-600">
                         {String(inv.month).padStart(2, '0')}/{inv.year}
                       </td>
-                      <td className="px-3 py-3 text-sm font-mono text-slate-600 text-right">{fmt(inv.roomFee)}đ</td>
-                      <td className="px-3 py-3 text-sm font-mono text-slate-600 text-right">{fmt(inv.electricityFee)}đ</td>
-                      <td className="px-3 py-3 text-sm font-mono text-slate-600 text-right">{fmt(inv.waterFee)}đ</td>
-                      <td className="px-3 py-3 text-sm font-mono text-slate-600 text-right">{fmt(inv.serviceFee)}đ</td>
-                      <td className="px-3 py-3 text-sm font-mono font-bold text-slate-800 text-right">{fmt(inv.totalAmount)}đ</td>
-                      <td className="px-3 py-3 text-sm font-mono text-green-600 font-medium text-right">{fmt(inv.paidAmount)}đ</td>
-                      <td className={`px-3 py-3 text-sm font-mono font-semibold text-right ${remaining > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                      <td className="px-4 py-3.5 text-sm font-mono font-bold text-slate-900 text-right">{fmt(inv.totalAmount)}đ</td>
+                      <td className="px-4 py-3.5 text-sm font-mono text-emerald-600 font-medium text-right">{fmt(inv.paidAmount)}đ</td>
+                      <td className={`px-4 py-3.5 text-sm font-mono font-bold text-right ${remaining > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
                         {fmt(remaining)}đ
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">
                         {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('vi-VN') : '—'}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3.5">
                         <Badge
                           variant={
-                            inv.status === 3 ? 'success' : inv.status === 2 ? 'warning' : inv.status === 4 ? 'danger' : 'default'
+                            inv.status === 3 ? 'success' : inv.status === 4 ? 'danger' : 'warning'
                           }
                         >
-                          {inv.status === 3 ? 'Đã thanh toán' : inv.status === 2 ? 'Một phần' : inv.status === 4 ? 'Quá hạn' : 'Chưa thanh toán'}
+                          {inv.status === 3 ? 'Đã thanh toán' : inv.status === 4 ? 'Quá hạn' : 'Chưa thanh toán'}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => {
@@ -259,9 +255,9 @@ export const InvoicesPage: React.FC = () => {
                               setIsDetailOpen(true);
                             }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Chi tiết"
+                            title="Xem chi tiết khoản mục (Điện, nước, dịch vụ)"
                           >
-                            <Eye size={14} />
+                            <Eye size={15} />
                           </button>
                           {inv.status !== 3 && (
                             <button
@@ -269,7 +265,7 @@ export const InvoicesPage: React.FC = () => {
                               className="p-1.5 rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors"
                               title="Thu tiền"
                             >
-                              <CreditCard size={14} />
+                              <CreditCard size={15} />
                             </button>
                           )}
                         </div>
@@ -366,17 +362,27 @@ export const InvoicesPage: React.FC = () => {
           />
 
           <Input
-            label="Phí dịch vụ chung (VNĐ/người)"
-            type="number"
+            label="Phí dịch vụ chung (người/tháng)"
+            isCurrency
             value={genForm.serviceFee}
             onChange={(e) => setGenForm({ ...genForm, serviceFee: Number(e.target.value) })}
             required
           />
 
-          <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700 space-y-1">
-            <p className="font-semibold">Lưu ý khi tạo:</p>
-            <p>&bull; Tiền điện và nước sẽ được tính tự động từ bảng ghi chỉ số chốt tháng.</p>
-            <p>&bull; Thông báo hóa đơn sẽ được gửi ngay đến tài khoản cá nhân của sinh viên.</p>
+          <div className="p-3 bg-blue-50/90 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1.5">
+            <p className="font-bold flex items-center gap-1.5 text-blue-950">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
+              Cơ chế phát hành & bổ sung hóa đơn:
+            </p>
+            <p className="leading-relaxed">
+              &bull; <strong>Tự động bổ sung vào hóa đơn hiện tại:</strong> Nếu sinh viên đã có hóa đơn trong tháng này (ví dụ hóa đơn duyệt phòng đợt đầu chưa thanh toán), hệ thống sẽ cập nhật bổ sung tiền điện, nước và dịch vụ vào chính hóa đơn đó, <span className="underline font-semibold">không tạo hóa đơn mới trùng lặp</span>.
+            </p>
+            <p className="leading-relaxed">
+              &bull; <strong>Tạo mới cho sinh viên chưa có hóa đơn:</strong> Đối với hợp đồng chưa được phát hành hóa đơn trong tháng, hệ thống tạo mới hóa đơn trọn gói.
+            </p>
+            <p className="leading-relaxed text-blue-800">
+              &bull; Tiền điện và nước tự động tính từ bảng ghi chỉ số chốt tháng của phòng và chia đều cho từng sinh viên trong phòng.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -407,8 +413,8 @@ export const InvoicesPage: React.FC = () => {
             </div>
 
             <Input
-              label="Số tiền thu (VNĐ)"
-              type="number"
+              label="Số tiền thu"
+              isCurrency
               value={payForm.amount}
               onChange={(e) => setPayForm({ ...payForm, amount: Number(e.target.value) })}
               required

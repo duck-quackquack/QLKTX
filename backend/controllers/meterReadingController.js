@@ -1,6 +1,8 @@
 import { MeterReading } from '../models/MeterReading.js';
 import { Room } from '../models/Room.js';
 import { Building } from '../models/Building.js';
+import { Contract } from '../models/Contract.js';
+import { Invoice } from '../models/Invoice.js';
 import { getNextSequence } from '../models/Counter.js';
 
 export const getMeterReadings = async (req, res, next) => {
@@ -30,18 +32,25 @@ export const getMeterReadings = async (req, res, next) => {
       const building = room ? buildingMap.get(room.buildingId) : null;
       const electricityUsage = Math.max(0, m.electricityNew - m.electricityOld);
       const waterUsage = Math.max(0, m.waterNew - m.waterOld);
-      const electricityAmount = electricityUsage * (m.electricityUnitPrice || 3500);
-      const waterAmount = waterUsage * (m.waterUnitPrice || 15000);
+      const electricityUnitPrice = m.electricityUnitPrice || 3500;
+      const waterUnitPrice = m.waterUnitPrice || 15000;
+      const electricityAmount = electricityUsage * electricityUnitPrice;
+      const waterAmount = waterUsage * waterUnitPrice;
+      const totalAmount = electricityAmount + waterAmount;
 
       return {
         ...m,
         roomNumber: room?.roomNumber || '',
         buildingName: building?.name || '',
+        electricityUnitPrice,
+        waterUnitPrice,
         electricityUsage,
         waterUsage,
         electricityAmount,
         waterAmount,
-        totalAmount: electricityAmount + waterAmount,
+        totalElectricityCost: electricityAmount,
+        totalWaterCost: waterAmount,
+        totalAmount,
       };
     });
 
@@ -82,8 +91,11 @@ export const getMeterReadingById = async (req, res, next) => {
 
     const electricityUsage = Math.max(0, m.electricityNew - m.electricityOld);
     const waterUsage = Math.max(0, m.waterNew - m.waterOld);
-    const electricityAmount = electricityUsage * (m.electricityUnitPrice || 3500);
-    const waterAmount = waterUsage * (m.waterUnitPrice || 15000);
+    const electricityUnitPrice = m.electricityUnitPrice || 3500;
+    const waterUnitPrice = m.waterUnitPrice || 15000;
+    const electricityAmount = electricityUsage * electricityUnitPrice;
+    const waterAmount = waterUsage * waterUnitPrice;
+    const totalAmount = electricityAmount + waterAmount;
 
     res.json({
       success: true,
@@ -91,11 +103,15 @@ export const getMeterReadingById = async (req, res, next) => {
         ...m,
         roomNumber: room?.roomNumber || '',
         buildingName: building?.name || '',
+        electricityUnitPrice,
+        waterUnitPrice,
         electricityUsage,
         waterUsage,
         electricityAmount,
         waterAmount,
-        totalAmount: electricityAmount + waterAmount,
+        totalElectricityCost: electricityAmount,
+        totalWaterCost: waterAmount,
+        totalAmount,
       },
     });
   } catch (error) {
@@ -145,19 +161,55 @@ export const recordMeterReading = async (req, res, next) => {
       waterNew,
       electricityUnitPrice,
       waterUnitPrice,
+      autoGenerateInvoicesForRoom,
     } = req.body;
 
     const rId = Number(roomId);
     const m = Number(month);
     const y = Number(year);
 
+    if (!rId || !m || !y) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp phòng, tháng và năm ghi chỉ số.' });
+    }
+
+    const room = await Room.findOne({ id: rId });
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng tương ứng.' });
+    }
+
+    const eOld = Number(electricityOld);
+    const eNew = Number(electricityNew);
+    const wOld = Number(waterOld);
+    const wNew = Number(waterNew);
+
+    if (eOld < 0 || eNew < 0 || wOld < 0 || wNew < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ số điện nước không được là số âm.',
+      });
+    }
+
+    if (isNaN(eOld) || isNaN(eNew) || eNew < eOld) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ số điện mới không được nhỏ hơn chỉ số điện cũ.',
+      });
+    }
+
+    if (isNaN(wOld) || isNaN(wNew) || wNew < wOld) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ số nước mới không được nhỏ hơn chỉ số nước cũ.',
+      });
+    }
+
     let reading = await MeterReading.findOne({ roomId: rId, month: m, year: y });
 
     if (reading) {
-      reading.electricityOld = Number(electricityOld);
-      reading.electricityNew = Number(electricityNew);
-      reading.waterOld = Number(waterOld);
-      reading.waterNew = Number(waterNew);
+      reading.electricityOld = eOld;
+      reading.electricityNew = eNew;
+      reading.waterOld = wOld;
+      reading.waterNew = wNew;
       if (electricityUnitPrice) reading.electricityUnitPrice = Number(electricityUnitPrice);
       if (waterUnitPrice) reading.waterUnitPrice = Number(waterUnitPrice);
       reading.recordedBy = req.user?.username || 'staff';
@@ -170,15 +222,66 @@ export const recordMeterReading = async (req, res, next) => {
         roomId: rId,
         month: m,
         year: y,
-        electricityOld: Number(electricityOld),
-        electricityNew: Number(electricityNew),
-        waterOld: Number(waterOld),
-        waterNew: Number(waterNew),
+        electricityOld: eOld,
+        electricityNew: eNew,
+        waterOld: wOld,
+        waterNew: wNew,
         electricityUnitPrice: Number(electricityUnitPrice) || 3500,
         waterUnitPrice: Number(waterUnitPrice) || 15000,
         recordedBy: req.user?.username || 'staff',
         recordedDate: new Date(),
       });
+    }
+
+    if (autoGenerateInvoicesForRoom) {
+      const activeContracts = await Contract.find({ roomId: rId, status: 2 });
+      if (activeContracts.length > 0) {
+        const studentCount = activeContracts.length;
+        const elecUsage = Math.max(0, eNew - eOld);
+        const waterUsage = Math.max(0, wNew - wOld);
+        const elecUnitPrice = Number(electricityUnitPrice) || reading.electricityUnitPrice || 3500;
+        const watUnitPrice = Number(waterUnitPrice) || reading.waterUnitPrice || 15000;
+        const elecPerStudent = Math.round((elecUsage * elecUnitPrice) / studentCount);
+        const waterPerStudent = Math.round((waterUsage * watUnitPrice) / studentCount);
+
+        for (const contract of activeContracts) {
+          const inv = await Invoice.findOne({ contractId: contract.id, month: m, year: y });
+          if (inv && (inv.status === 1 || inv.status === 2)) {
+            // Update existing unpaid or partially paid invoice with split electricity and water
+            inv.electricityFee = elecPerStudent;
+            inv.waterFee = waterPerStudent;
+            inv.totalAmount =
+              (inv.roomFee || contract.monthlyRent || 0) + elecPerStudent + waterPerStudent + (inv.serviceFee || 0) + (inv.otherFee || 0);
+            await inv.save();
+          } else if (!inv) {
+            const id = await getNextSequence('invoice_id');
+            let invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(contract.studentId).padStart(4, '0')}`;
+            const duplicateCode = await Invoice.findOne({ invoiceCode });
+            if (duplicateCode) {
+              invoiceCode = `INV-${y}${String(m).padStart(2, '0')}-${String(contract.studentId).padStart(4, '0')}-${String(id).padStart(3, '0')}`;
+            }
+            const total = (contract.monthlyRent || 0) + elecPerStudent + waterPerStudent + 30000;
+            await Invoice.create({
+              id,
+              invoiceCode,
+              studentId: contract.studentId,
+              contractId: contract.id,
+              month: m,
+              year: y,
+              roomFee: contract.monthlyRent || 0,
+              electricityFee: elecPerStudent,
+              waterFee: waterPerStudent,
+              serviceFee: 30000,
+              otherFee: 0,
+              totalAmount: total,
+              paidAmount: 0,
+              dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+              status: 1,
+              notes: `Hóa đơn phòng P.${room.roomNumber} kỳ ${String(m).padStart(2, '0')}/${y}`,
+            });
+          }
+        }
+      }
     }
 
     res.status(201).json({ success: true, message: 'Ghi chỉ số điện nước thành công', data: reading });

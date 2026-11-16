@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { StudentHeader } from './StudentHeader';
+import { StudentFooter } from './StudentFooter';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
@@ -16,12 +17,12 @@ export const StudentLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar role="student" />
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <StudentHeader />
+      <main className="flex-1 flex flex-col min-w-0 w-full pb-20 sm:pb-0">
         <Outlet />
       </main>
+      <StudentFooter />
     </div>
   );
 };
-

@@ -11,7 +11,7 @@ const contractSchema = new mongoose.Schema(
     endDate: { type: Date, required: true },
     monthlyRent: { type: Number, required: true },
     depositAmount: { type: Number, default: 0 },
-    status: { type: Number, default: 1 }, // 1: Active, 2: Terminated, 3: Expired
+    status: { type: Number, default: 2 }, // 1: Pending, 2: Active, 3: Expired, 4: Terminated
     terms: { type: String, default: null },
     terminatedDate: { type: Date, default: null },
     terminationReason: { type: String, default: null },

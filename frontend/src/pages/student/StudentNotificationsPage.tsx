@@ -76,7 +76,7 @@ export const StudentNotificationsPage: React.FC = () => {
                         {new Date(n.createdAt).toLocaleString('vi-VN')}
                       </span>
                       {!n.isRead && (
-                        <span className="text-indigo-600 font-bold">&bull; Chưa đọc</span>
+                        <span className="text-indigo-600 font-bold">· Chưa đọc</span>
                       )}
                     </div>
                   </div>

@@ -7,6 +7,8 @@ const registrationSchema = new mongoose.Schema(
     studentId: { type: Number, required: true, index: true },
     preferredBuildingId: { type: Number, default: null },
     preferredRoomType: { type: String, default: null },
+    preferredRoomId: { type: Number, default: null },
+    preferredRoomNumber: { type: String, default: null },
     desiredStartDate: { type: Date, required: true },
     durationMonths: { type: Number, default: 6 },
     reasonOrNote: { type: String, default: null },

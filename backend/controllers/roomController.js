@@ -4,9 +4,12 @@ import { Building } from '../models/Building.js';
 import { Student } from '../models/Student.js';
 import { Contract } from '../models/Contract.js';
 import { getNextSequence } from '../models/Counter.js';
+import { syncExpiredContracts } from './contractController.js';
 
 export const getRooms = async (req, res, next) => {
   try {
+    await syncExpiredContracts();
+
     const { buildingId, floor, roomType, status, searchTerm, pageNumber = 1, pageSize = 12 } = req.query;
     const query = {};
 
@@ -49,12 +52,22 @@ export const getRooms = async (req, res, next) => {
           };
         });
 
+      const occupiedCount = rBeds.filter((bd) => bd.status === 2).length;
+      const rawAvailable = rBeds.filter((bd) => bd.status === 1).length;
+      const computedStatus = r.status === 3 ? 3 : (rawAvailable === 0 || occupiedCount >= r.capacity ? 2 : 1);
+      const availableCount = computedStatus === 3 ? 0 : rawAvailable;
+
+      if (r.status !== computedStatus) {
+        Room.updateOne({ id: r.id }, { $set: { status: computedStatus } }).exec();
+      }
+
       return {
         ...r,
+        status: computedStatus,
         buildingName: b?.name || '',
         buildingCode: b?.code || '',
-        occupiedCount: rBeds.filter((bd) => bd.status === 2).length,
-        availableCount: rBeds.filter((bd) => bd.status === 1).length,
+        occupiedCount,
+        availableCount,
         beds: rBeds,
       };
     });
@@ -84,7 +97,7 @@ export const getRoomsByBuilding = async (req, res, next) => {
 
     const roomIds = rooms.map((r) => r.id);
     const beds = await Bed.find({ roomId: { $in: roomIds } }).lean();
-    const contracts = await Contract.find({ status: 1 }).lean();
+    const contracts = await Contract.find({ status: 2 }).lean();
     const students = await Student.find().lean();
     const studentMap = new Map(students.map((s) => [s.id, s]));
 
@@ -101,12 +114,22 @@ export const getRoomsByBuilding = async (req, res, next) => {
           };
         });
 
+      const occupiedCount = rBeds.filter((bd) => bd.status === 2).length;
+      const rawAvailable = rBeds.filter((bd) => bd.status === 1).length;
+      const computedStatus = r.status === 3 ? 3 : (rawAvailable === 0 || occupiedCount >= r.capacity ? 2 : 1);
+      const availableCount = computedStatus === 3 ? 0 : rawAvailable;
+
+      if (r.status !== computedStatus) {
+        Room.updateOne({ id: r.id }, { $set: { status: computedStatus } }).exec();
+      }
+
       return {
         ...r,
+        status: computedStatus,
         buildingName: building?.name || '',
         buildingCode: building?.code || '',
-        occupiedCount: rBeds.filter((bd) => bd.status === 2).length,
-        availableCount: rBeds.filter((bd) => bd.status === 1).length,
+        occupiedCount,
+        availableCount,
         beds: rBeds,
       };
     });
@@ -126,7 +149,7 @@ export const getRoomById = async (req, res, next) => {
 
     const building = await Building.findOne({ id: room.buildingId }).lean();
     const beds = await Bed.find({ roomId: room.id }).lean();
-    const contracts = await Contract.find({ status: 1 }).lean();
+    const contracts = await Contract.find({ status: 2 }).lean();
     const students = await Student.find().lean();
     const studentMap = new Map(students.map((s) => [s.id, s]));
 
@@ -140,14 +163,24 @@ export const getRoomById = async (req, res, next) => {
       };
     });
 
+    const occupiedCount = rBeds.filter((bd) => bd.status === 2).length;
+    const rawAvailable = rBeds.filter((bd) => bd.status === 1).length;
+    const computedStatus = room.status === 3 ? 3 : (rawAvailable === 0 || occupiedCount >= room.capacity ? 2 : 1);
+    const availableCount = computedStatus === 3 ? 0 : rawAvailable;
+
+    if (room.status !== computedStatus) {
+      Room.updateOne({ id: room.id }, { $set: { status: computedStatus } }).exec();
+    }
+
     res.json({
       success: true,
       data: {
         ...room,
+        status: computedStatus,
         buildingName: building?.name || '',
         buildingCode: building?.code || '',
-        occupiedCount: rBeds.filter((bd) => bd.status === 2).length,
-        availableCount: rBeds.filter((bd) => bd.status === 1).length,
+        occupiedCount,
+        availableCount,
         beds: rBeds,
       },
     });
@@ -159,6 +192,20 @@ export const getRoomById = async (req, res, next) => {
 export const createRoom = async (req, res, next) => {
   try {
     const { buildingId, roomNumber, floor, roomType, capacity, basePrice, description, genderAllowed } = req.body;
+
+    const building = await Building.findOne({ id: Number(buildingId) });
+    if (!building) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tòa nhà tương ứng.' });
+    }
+
+    const maxFloors = building.numberOfFloors || building.totalFloors || 4;
+    const flr = Number(floor) || 1;
+    if (flr < 1 || flr > maxFloors) {
+      return res.status(400).json({
+        success: false,
+        message: `Số tầng không hợp lệ. Tòa nhà ${building.name} chỉ có tối đa ${maxFloors} tầng.`,
+      });
+    }
 
     const existing = await Room.findOne({
       buildingId: Number(buildingId),
@@ -175,7 +222,7 @@ export const createRoom = async (req, res, next) => {
       id,
       buildingId: Number(buildingId),
       roomNumber: roomNumber.trim().toUpperCase(),
-      floor: Number(floor) || 1,
+      floor: flr,
       roomType: roomType || `${cap} người`,
       capacity: cap,
       basePrice: Number(basePrice),
@@ -196,8 +243,6 @@ export const createRoom = async (req, res, next) => {
       });
       createdBeds.push(bed);
     }
-
-    const building = await Building.findOne({ id: room.buildingId });
 
     res.status(201).json({
       success: true,
@@ -221,6 +266,18 @@ export const updateRoom = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy phòng.' });
     }
 
+    if (req.body.floor !== undefined) {
+      const flr = Number(req.body.floor) || 1;
+      const building = await Building.findOne({ id: room.buildingId });
+      const maxFloors = building?.numberOfFloors || building?.totalFloors || 4;
+      if (flr < 1 || flr > maxFloors) {
+        return res.status(400).json({
+          success: false,
+          message: `Số tầng không hợp lệ. Tòa nhà ${building?.name} chỉ có tối đa ${maxFloors} tầng.`,
+        });
+      }
+    }
+
     const fields = ['roomNumber', 'floor', 'roomType', 'capacity', 'basePrice', 'status', 'description', 'genderAllowed'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) {
@@ -237,11 +294,31 @@ export const updateRoom = async (req, res, next) => {
 
 export const deleteRoom = async (req, res, next) => {
   try {
-    const room = await Room.findOneAndDelete({ id: Number(req.params.id) });
+    const roomId = Number(req.params.id);
+    const room = await Room.findOne({ id: roomId });
     if (!room) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy phòng.' });
     }
+
+    // Check if room has active contracts or occupied beds
+    const activeContract = await Contract.findOne({ roomId, status: 2 });
+    if (activeContract) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phòng này đang có sinh viên cư trú theo hợp đồng hiệu lực. Không thể xóa.',
+      });
+    }
+
+    const occupiedBed = await Bed.findOne({ roomId, status: 2 });
+    if (occupiedBed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phòng này đang có giường ở trạng thái đang sử dụng. Không thể xóa.',
+      });
+    }
+
     await Bed.deleteMany({ roomId: room.id });
+    await Room.findOneAndDelete({ id: roomId });
     res.json({ success: true, message: 'Xóa phòng thành công' });
   } catch (error) {
     next(error);
@@ -258,11 +335,20 @@ export const addBed = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy phòng.' });
     }
 
+    // Rule 3.3: Bed count cannot exceed room capacity
+    const currentBedsCount = await Bed.countDocuments({ roomId });
+    if (currentBedsCount >= (room.capacity || 4)) {
+      return res.status(400).json({
+        success: false,
+        message: `Phòng đã đạt sức chứa tối đa (${room.capacity} giường). Không thể thêm giường mới.`,
+      });
+    }
+
     const bedId = await getNextSequence('bed_id');
     const bed = await Bed.create({
       id: bedId,
       roomId,
-      bedNumber: (bedNumber || `G${bedId}`).toString().trim(),
+      bedNumber: (bedNumber || `G${String(currentBedsCount + 1).padStart(2, '0')}`).toString().trim(),
       status: 1,
       notes: notes || null,
     });
@@ -283,9 +369,32 @@ export const updateBedStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giường.' });
     }
 
-    if (status !== undefined) bed.status = Number(status);
+    if (status !== undefined) {
+      const newStatus = Number(status);
+      // If setting to Available, ensure no active contract
+      if (newStatus === 1) {
+        const activeContract = await Contract.findOne({ bedId, status: 2 });
+        if (activeContract) {
+          return res.status(400).json({
+            success: false,
+            message: 'Giường này đang có hợp đồng hiệu lực. Vui lòng thanh lý hợp đồng trước khi chuyển trạng thái còn trống.',
+          });
+        }
+      }
+      bed.status = newStatus;
+    }
+
     if (notes !== undefined) bed.notes = notes;
     await bed.save();
+
+    // Auto-sync room status
+    const room = await Room.findOne({ id: bed.roomId });
+    if (room && room.status !== 3) {
+      const roomBeds = await Bed.find({ roomId: room.id });
+      const availableBeds = roomBeds.filter((b) => b.status === 1);
+      room.status = availableBeds.length === 0 ? 2 : 1;
+      await room.save();
+    }
 
     res.json({ success: true, message: 'Cập nhật trạng thái giường thành công', data: bed });
   } catch (error) {
@@ -295,10 +404,28 @@ export const updateBedStatus = async (req, res, next) => {
 
 export const deleteBed = async (req, res, next) => {
   try {
-    const bed = await Bed.findOneAndDelete({ id: Number(req.params.bedId) });
+    const bedId = Number(req.params.bedId);
+    const bed = await Bed.findOne({ id: bedId });
     if (!bed) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy giường.' });
     }
+
+    if (bed.status === 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Giường đang có người ở. Không thể xóa.',
+      });
+    }
+
+    const activeContract = await Contract.findOne({ bedId, status: 2 });
+    if (activeContract) {
+      return res.status(400).json({
+        success: false,
+        message: 'Giường này đang liên kết với hợp đồng còn hiệu lực. Không thể xóa.',
+      });
+    }
+
+    await Bed.findOneAndDelete({ id: bedId });
     res.json({ success: true, message: 'Xóa giường thành công' });
   } catch (error) {
     next(error);
@@ -307,6 +434,8 @@ export const deleteBed = async (req, res, next) => {
 
 export const getAvailableBeds = async (req, res, next) => {
   try {
+    await syncExpiredContracts();
+
     const { buildingId } = req.query;
     let roomQuery = {};
     if (buildingId) {

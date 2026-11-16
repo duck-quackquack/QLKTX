@@ -7,8 +7,11 @@ import { Badge, statusBadge } from '../../components/common/Badge';
 import { buildingApi } from '../../api';
 import { Building } from '../../types';
 import { Plus, Edit2, Trash2, Building2, Search } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const BuildingsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 1;
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -109,7 +112,7 @@ export const BuildingsPage: React.FC = () => {
     b.code.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalRooms = buildings.reduce((a, b) => a + (b.totalRooms || 0), 0);
+  const totalRooms = buildings.reduce((a, b) => a + (b.totalRooms ?? b.roomCount ?? 0), 0);
   const totalBeds = buildings.reduce((a, b) => a + (b.totalBeds || 0), 0);
   const occupiedBeds = buildings.reduce((a, b) => a + (b.occupiedBeds || 0), 0);
   const availableBeds = totalBeds - occupiedBeds;
@@ -128,9 +131,11 @@ export const BuildingsPage: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-800">Quản lý Tòa nhà</h1>
             <p className="text-sm text-slate-500 mt-0.5">Tổng cộng {buildings.length} tòa nhà trong hệ thống</p>
           </div>
-          <Button icon={<Plus size={15} />} onClick={() => setIsCreateOpen(true)}>
-            Thêm tòa nhà
-          </Button>
+          {isAdmin && (
+            <Button icon={<Plus size={15} />} onClick={() => setIsCreateOpen(true)}>
+              Thêm tòa nhà
+            </Button>
+          )}
         </div>
 
         {/* Summary Stat Cards */}
@@ -198,7 +203,7 @@ export const BuildingsPage: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600 text-center">{b.numberOfFloors} tầng</td>
-                      <td className="px-4 py-3 text-sm text-slate-700 font-semibold text-center">{b.totalRooms || 0}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700 font-semibold text-center">{b.totalRooms ?? b.roomCount ?? 0}</td>
                       <td className="px-4 py-3 text-sm text-slate-700 font-semibold text-center">{b.totalBeds || 0}</td>
                       <td className="px-4 py-3 text-sm text-slate-600 text-center">{b.occupiedBeds || 0}</td>
                       <td className="px-4 py-3 text-sm text-green-600 font-bold text-center">{avail}</td>
@@ -222,16 +227,18 @@ export const BuildingsPage: React.FC = () => {
                           >
                             <Edit2 size={14} />
                           </button>
-                          <button
-                            onClick={() => {
-                              setSelectedBuilding(b);
-                              setShowDelete(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Xóa"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => {
+                                setSelectedBuilding(b);
+                                setShowDelete(true);
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Xóa"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

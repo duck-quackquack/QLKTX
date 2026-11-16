@@ -65,34 +65,29 @@ export const StudentRoomPage: React.FC = () => {
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
       <Header
-        title={`Phòng ${room.roomNumber} - ${room.buildingName}`}
-        subtitle={`Giường của bạn: ${contract.bedNumber} &bull; Tầng ${room.floor}`}
+        title="Phòng & Giường của tôi"
+        subtitle={`Phòng ${room.roomNumber} · ${room.buildingName} · Giường của bạn: ${contract.bedNumber} · Tầng ${room.floor}`}
       />
 
-      <div className="max-w-5xl mx-auto px-6 mt-6 flex flex-col gap-6">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Phòng & Giường của tôi</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Thông tin chi tiết về phòng ở, các bạn cùng phòng và hợp đồng</p>
-        </div>
-
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-6 flex flex-col gap-6">
         {/* Room Header Card */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold text-2xl shrink-0">
+        <div className="w-full max-w-full overflow-hidden box-border bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="px-3.5 py-2 min-w-[5rem] h-14 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-lg shrink-0 tracking-tight shadow-sm">
               P.{room.roomNumber}
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">
-                Phòng {room.roomNumber} &bull; {room.buildingName}
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold text-slate-800 truncate">
+                Phòng {room.roomNumber} · {room.buildingName}
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Loại phòng: <span className="font-semibold text-slate-700">{room.roomType}</span> &bull; Tiền phòng:{' '}
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                Loại phòng: <span className="font-semibold text-slate-700">{room.roomType}</span> · Tiền phòng:{' '}
                 <span className="font-mono font-bold text-blue-600">{fmt(room.basePrice)}đ/tháng</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link to="/student/repairs">
               <Button variant="outline" size="sm" icon={<Wrench size={14} />}>
                 Báo hỏng phòng này

@@ -1,6 +1,7 @@
 import { Building } from '../models/Building.js';
 import { Room } from '../models/Room.js';
 import { Bed } from '../models/Bed.js';
+import { Contract } from '../models/Contract.js';
 import { getNextSequence } from '../models/Counter.js';
 
 export const getBuildings = async (req, res, next) => {
@@ -16,6 +17,7 @@ export const getBuildings = async (req, res, next) => {
 
       return {
         ...b,
+        totalRooms: bRooms.length,
         roomCount: bRooms.length,
         totalBeds: bBeds.length,
         occupiedBeds: bBeds.filter((bd) => bd.status === 2).length,
@@ -44,6 +46,7 @@ export const getBuildingById = async (req, res, next) => {
       success: true,
       data: {
         ...building,
+        totalRooms: rooms.length,
         roomCount: rooms.length,
         totalBeds: beds.length,
         occupiedBeds: beds.filter((bd) => bd.status === 2).length,
@@ -104,14 +107,36 @@ export const updateBuilding = async (req, res, next) => {
 
 export const deleteBuilding = async (req, res, next) => {
   try {
-    const building = await Building.findOneAndDelete({ id: Number(req.params.id) });
+    const buildingId = Number(req.params.id);
+    const building = await Building.findOne({ id: buildingId });
     if (!building) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy tòa nhà.' });
     }
-    const rooms = await Room.find({ buildingId: building.id });
+
+    const rooms = await Room.find({ buildingId });
     const roomIds = rooms.map((r) => r.id);
+
+    // Check if any occupied beds exist in this building
+    const occupiedBed = await Bed.findOne({ roomId: { $in: roomIds }, status: 2 });
+    if (occupiedBed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tòa nhà đang có sinh viên cư trú. Không thể xóa tòa nhà này.',
+      });
+    }
+
+    // Check if any active contracts exist in this building
+    const activeContract = await Contract.findOne({ roomId: { $in: roomIds }, status: 2 });
+    if (activeContract) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tòa nhà đang liên kết với hợp đồng lưu trú còn hiệu lực. Không thể xóa.',
+      });
+    }
+
     await Bed.deleteMany({ roomId: { $in: roomIds } });
-    await Room.deleteMany({ buildingId: building.id });
+    await Room.deleteMany({ buildingId });
+    await Building.findOneAndDelete({ id: buildingId });
 
     res.json({ success: true, message: 'Xóa tòa nhà thành công' });
   } catch (error) {

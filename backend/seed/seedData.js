@@ -443,7 +443,7 @@ export const seedDatabase = async () => {
     const violations = [
       {
         id: 1,
-        studentId: 3,
+        studentId: 4,
         title: 'Về phòng muộn sau giờ giới nghiêm',
         description: 'Về phòng sau 23h30 không có lý do chính đáng.',
         violationType: 'Nội quy giờ giấc',

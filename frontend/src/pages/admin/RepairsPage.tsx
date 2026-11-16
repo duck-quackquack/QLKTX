@@ -31,6 +31,12 @@ export const RepairsPage: React.FC = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
   const [modalErr, setModalErr] = useState('');
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    pending: 0,
+    processing: 0,
+    completed: 0,
+  });
 
   const fetchRepairs = async () => {
     setLoading(true);
@@ -45,6 +51,9 @@ export const RepairsPage: React.FC = () => {
         setRepairs(res.data.items);
         setTotalPages(res.data.totalPages);
         setTotalItems(res.data.totalItems);
+        if ((res.data as any).counts) {
+          setStatusCounts((res.data as any).counts);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -93,11 +102,7 @@ export const RepairsPage: React.FC = () => {
     }
   };
 
-  const counts = {
-    pending: repairs.filter((r) => r.status === 1).length,
-    processing: repairs.filter((r) => r.status === 2).length,
-    completed: repairs.filter((r) => r.status === 3).length,
-  };
+  const counts = statusCounts;
 
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
@@ -115,10 +120,10 @@ export const RepairsPage: React.FC = () => {
         {/* Counts summary header cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Tất cả yêu cầu', count: totalItems, color: 'text-slate-700' },
-            { label: 'Chờ tiếp nhận', count: counts.pending, color: 'text-amber-600' },
-            { label: 'Đang sửa chữa', count: counts.processing, color: 'text-blue-600' },
-            { label: 'Đã hoàn thành', count: counts.completed, color: 'text-green-600' },
+            { label: 'Tất cả yêu cầu', count: statusCounts.all, color: 'text-slate-700' },
+            { label: 'Chờ tiếp nhận', count: statusCounts.pending, color: 'text-amber-600' },
+            { label: 'Đang sửa chữa', count: statusCounts.processing, color: 'text-blue-600' },
+            { label: 'Đã hoàn thành', count: statusCounts.completed, color: 'text-green-600' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-slate-200 p-4 text-center shadow-sm">
               <p className={`text-2xl font-bold ${s.color}`}>{s.count}</p>
@@ -306,8 +311,8 @@ export const RepairsPage: React.FC = () => {
             </div>
 
             <Input
-              label="Chi phí phát sinh (VNĐ) nếu có"
-              type="number"
+              label="Chi phí phát sinh (nếu có)"
+              isCurrency
               value={updateForm.repairCost}
               onChange={(e) => setUpdateForm({ ...updateForm, repairCost: Number(e.target.value) })}
             />

@@ -7,7 +7,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (credentials: any) => Promise<AuthResponse>;
-  socialLogin: (data: any) => Promise<AuthResponse>;
+  socialLogin: (data: any) => Promise<any>;
   register: (data: any) => Promise<AuthResponse>;
   logout: () => void;
   updateCurrentUser: (user: User) => void;
@@ -61,8 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     throw new Error(res.message || 'Đăng nhập thất bại');
   };
 
-  const socialLogin = async (data: any): Promise<AuthResponse> => {
+  const socialLogin = async (data: any): Promise<any> => {
     const res = await authApi.socialLogin(data);
+    if ((res as any).requireLink) {
+      return res;
+    }
     if (res.success && res.data) {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));

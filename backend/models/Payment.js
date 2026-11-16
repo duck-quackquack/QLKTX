@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 const paymentSchema = new mongoose.Schema(
   {
     id: { type: Number, unique: true, index: true },
-    invoiceId: { type: Number, required: true, index: true },
+    invoiceId: { type: Number, default: null, index: true },
+    studentId: { type: Number, default: null, index: true },
     paymentCode: { type: String, required: true, unique: true, trim: true },
     amount: { type: Number, required: true },
     paymentDate: { type: Date, default: Date.now },

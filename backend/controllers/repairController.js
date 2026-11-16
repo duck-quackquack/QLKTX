@@ -4,6 +4,7 @@ import { Room } from '../models/Room.js';
 import { Building } from '../models/Building.js';
 import { Contract } from '../models/Contract.js';
 import { Notification } from '../models/Notification.js';
+import { Payment } from '../models/Payment.js';
 import { getNextSequence } from '../models/Counter.js';
 
 export const getRepairs = async (req, res, next) => {
@@ -26,7 +27,18 @@ export const getRepairs = async (req, res, next) => {
     const limit = parseInt(pageSize, 10) || 10;
     const skip = (page - 1) * limit;
 
-    const totalCount = await RepairRequest.countDocuments(query);
+    const baseQuery = {};
+    if (roomId) baseQuery.roomId = Number(roomId);
+    if (studentId) baseQuery.studentId = Number(studentId);
+
+    const [totalCount, allCount, pendingCount, processingCount, completedCount] = await Promise.all([
+      RepairRequest.countDocuments(query),
+      RepairRequest.countDocuments(baseQuery),
+      RepairRequest.countDocuments({ ...baseQuery, status: 1 }),
+      RepairRequest.countDocuments({ ...baseQuery, status: 2 }),
+      RepairRequest.countDocuments({ ...baseQuery, status: 3 }),
+    ]);
+
     const repairs = await RepairRequest.find(query).sort({ createdAt: -1, id: -1 }).skip(skip).limit(limit).lean();
 
     const students = await Student.find().lean();
@@ -63,6 +75,12 @@ export const getRepairs = async (req, res, next) => {
         pageNumber: page,
         pageSize: limit,
         totalPages: Math.ceil(totalCount / limit) || 1,
+        counts: {
+          all: allCount,
+          pending: pendingCount,
+          processing: processingCount,
+          completed: completedCount,
+        },
       },
     });
   } catch (error) {
@@ -115,6 +133,11 @@ export const getRepairById = async (req, res, next) => {
     const repair = await RepairRequest.findOne({ id: Number(req.params.id) }).lean();
     if (!repair) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu sửa chữa.' });
+    }
+
+    // IDOR protection: Student can only view their own repair request
+    if (req.user.role === 'Student' && repair.studentId !== req.user.studentId) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem yêu cầu sửa chữa này.' });
     }
 
     const student = await Student.findOne({ id: repair.studentId }).lean();
@@ -229,11 +252,14 @@ export const updateRepairStatus = async (req, res, next) => {
       if (student?.userId) {
         const notifId = await getNextSequence('notification_id');
         const statusText = Number(status) === 2 ? 'đang được xử lý' : Number(status) === 3 ? 'đã hoàn thành' : 'đã cập nhật';
+        const costStr = repair.repairCost > 0
+          ? ` Chi phí phát sinh: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(repair.repairCost)}. Vui lòng vào mục "Báo hỏng thiết bị" để quét mã thanh toán.`
+          : '';
         await Notification.create({
           id: notifId,
           userId: student.userId,
           title: 'Cập nhật yêu cầu sửa chữa',
-          content: `Yêu cầu sửa chữa "${repair.title}" của bạn ${statusText}.`,
+          content: `Yêu cầu sửa chữa "${repair.title}" của bạn ${statusText}.${costStr}`,
           type: 4, // Repair
         });
       }
@@ -242,6 +268,59 @@ export const updateRepairStatus = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Cập nhật trạng thái sửa chữa thành công',
+      data: repair,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const payRepairFee = async (req, res, next) => {
+  try {
+    const repair = await RepairRequest.findOne({ id: Number(req.params.id) });
+    if (!repair) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu sửa chữa.' });
+    }
+
+    // IDOR protection: Student can only pay their own repair
+    if (req.user.role === 'Student' && repair.studentId !== req.user.studentId) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền thanh toán chi phí của sinh viên khác.' });
+    }
+
+    if (repair.isPaid) {
+      return res.status(400).json({ success: false, message: 'Chi phí sửa chữa này đã được thanh toán trước đó.' });
+    }
+
+    if (!repair.repairCost || repair.repairCost <= 0) {
+      return res.status(400).json({ success: false, message: 'Yêu cầu sửa chữa này không phát sinh chi phí.' });
+    }
+
+    const { transactionCode, paymentMethod = 2 } = req.body;
+    const txCode = transactionCode?.trim() || `SC${repair.id}-${Date.now().toString().slice(-4)}`;
+
+    repair.isPaid = true;
+    repair.paidAt = new Date();
+    repair.paymentTransactionCode = txCode;
+    await repair.save();
+
+    // Create payment receipt record in payments collection
+    const paymentId = await getNextSequence('payment_id');
+    await Payment.create({
+      id: paymentId,
+      studentId: repair.studentId,
+      paymentCode: `PAY-SC${Date.now().toString().slice(-6)}-${String(paymentId).padStart(4, '0')}`,
+      amount: repair.repairCost,
+      paymentDate: new Date(),
+      paymentMethod: Number(paymentMethod) || 2,
+      transactionCode: txCode,
+      status: 2,
+      notes: `Thanh toán chi phí sửa chữa #${repair.id}: ${repair.title}`,
+      receivedBy: 'Ban Quản Trị KTX (VietQR)',
+    });
+
+    res.json({
+      success: true,
+      message: 'Thanh toán chi phí sửa chữa thành công',
       data: repair,
     });
   } catch (error) {

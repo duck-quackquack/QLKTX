@@ -14,7 +14,7 @@ router.use(protect);
 router.get('/my', getMyPayments);
 router.get('/', authorize('Admin', 'Staff'), getPayments);
 router.get('/:id', getPaymentById);
-router.post('/', authorize('Admin', 'Staff'), recordPayment);
+router.post('/', authorize('Admin', 'Staff', 'Student'), recordPayment);
 
 export default router;
 

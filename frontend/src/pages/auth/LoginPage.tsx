@@ -24,7 +24,7 @@ import {
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, socialLogin } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -43,6 +43,18 @@ export const LoginPage: React.FC = () => {
   const [forgotError, setForgotError] = useState('');
   const [forgotSuccess, setForgotSuccess] = useState('');
 
+  // Social Account Linking state
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkModalData, setLinkModalData] = useState<any>(null);
+  const [linkTab, setLinkTab] = useState<'existing' | 'new'>('existing');
+  const [linkUsername, setLinkUsername] = useState('');
+  const [linkPassword, setLinkPassword] = useState('');
+  const [customStudentCode, setCustomStudentCode] = useState('');
+  const [customPhone, setCustomPhone] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -60,11 +72,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
   };
 
   const openForgotModal = (e: React.MouseEvent) => {
@@ -136,7 +143,7 @@ export const LoginPage: React.FC = () => {
 
       const googleUser = await userInfoRes.json();
 
-      const authRes = await authApi.socialLogin({
+      const authData = await socialLogin({
         provider: 'google',
         email: googleUser.email,
         name: googleUser.name || googleUser.email.split('@')[0],
@@ -144,14 +151,10 @@ export const LoginPage: React.FC = () => {
         providerId: googleUser.sub,
       });
 
-      if (authRes.success && authRes.data) {
-        localStorage.setItem('token', authRes.data.token);
-        localStorage.setItem('user', JSON.stringify(authRes.data.user));
-        if (authRes.data.user.role === 1 || authRes.data.user.role === 2) {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/student/dashboard');
-        }
+      if (authData.user.role === 1 || authData.user.role === 2) {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/student/dashboard');
       }
     } catch (err: any) {
       setError(err.message || 'Đăng nhập bằng Google thất bại.');
@@ -183,7 +186,7 @@ export const LoginPage: React.FC = () => {
                   const fbName = userData.name || 'Người dùng Facebook';
                   const fbAvatar = userData.picture?.data?.url || null;
 
-                  const authRes = await authApi.socialLogin({
+                  const authData = await socialLogin({
                     provider: 'facebook',
                     email: fbEmail,
                     name: fbName,
@@ -191,14 +194,17 @@ export const LoginPage: React.FC = () => {
                     providerId: userData.id,
                   });
 
-                  if (authRes.success && authRes.data) {
-                    localStorage.setItem('token', authRes.data.token);
-                    localStorage.setItem('user', JSON.stringify(authRes.data.user));
-                    if (authRes.data.user.role === 1 || authRes.data.user.role === 2) {
-                      navigate('/admin/dashboard');
-                    } else {
-                      navigate('/student/dashboard');
-                    }
+                  if (authData.requireLink) {
+                    setLinkModalData(authData.data);
+                    setIsLinkModalOpen(true);
+                    setLinkError('');
+                    return;
+                  }
+
+                  if (authData.user.role === 1 || authData.user.role === 2) {
+                    navigate('/admin/dashboard');
+                  } else {
+                    navigate('/student/dashboard');
                   }
                 } catch (apiErr: any) {
                   setError(apiErr.message || 'Lỗi khi lưu thông tin đăng nhập Facebook.');
@@ -211,7 +217,7 @@ export const LoginPage: React.FC = () => {
               setSocialLoading(null);
             }
           },
-          { scope: 'public_profile,email' }
+          { scope: 'public_profile' }
         );
       } else {
         const mockOAuthData = {
@@ -222,21 +228,77 @@ export const LoginPage: React.FC = () => {
           providerId: 'fb_1353686059900909',
         };
 
-        const authRes = await authApi.socialLogin(mockOAuthData);
-        if (authRes.success && authRes.data) {
-          localStorage.setItem('token', authRes.data.token);
-          localStorage.setItem('user', JSON.stringify(authRes.data.user));
-          if (authRes.data.user.role === 1 || authRes.data.user.role === 2) {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/student/dashboard');
-          }
+        const authData = await socialLogin(mockOAuthData);
+        if (authData.user.role === 1 || authData.user.role === 2) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/student/dashboard');
         }
         setSocialLoading(null);
       }
     } catch (err: any) {
       setError(err.message || 'Đăng nhập qua Facebook thất bại.');
       setSocialLoading(null);
+    }
+  };
+
+  const handleConfirmLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLinkError('');
+    setLinkLoading(true);
+
+    try {
+      if (linkTab === 'existing') {
+        if (!linkUsername.trim() || !linkPassword) {
+          setLinkError('Vui lòng nhập Tên đăng nhập/Mã SV và Mật khẩu KTX.');
+          setLinkLoading(false);
+          return;
+        }
+
+        const authData = await socialLogin({
+          provider: linkModalData.provider,
+          providerId: linkModalData.providerId,
+          name: linkModalData.name,
+          avatarUrl: linkModalData.avatarUrl,
+          linkUsername: linkUsername.trim(),
+          linkPassword: linkPassword,
+        });
+
+        setIsLinkModalOpen(false);
+        if (authData.user.role === 1 || authData.user.role === 2) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/student/dashboard');
+        }
+      } else {
+        if (!customStudentCode.trim() || !customPhone.trim()) {
+          setLinkError('Vui lòng nhập Mã số sinh viên và Số điện thoại.');
+          setLinkLoading(false);
+          return;
+        }
+
+        const authData = await socialLogin({
+          provider: linkModalData.provider,
+          providerId: linkModalData.providerId,
+          name: linkModalData.name,
+          avatarUrl: linkModalData.avatarUrl,
+          email: customEmail.trim() || `${linkModalData.providerId}@facebook.user`,
+          createNew: true,
+          customStudentCode: customStudentCode.trim(),
+          customPhone: customPhone.trim(),
+        });
+
+        setIsLinkModalOpen(false);
+        if (authData.user.role === 1 || authData.user.role === 2) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/student/dashboard');
+        }
+      }
+    } catch (err: any) {
+      setLinkError(err.message || 'Không thể liên kết tài khoản Facebook.');
+    } finally {
+      setLinkLoading(false);
     }
   };
 
@@ -405,34 +467,7 @@ export const LoginPage: React.FC = () => {
             </div>
           </form>
 
-          {/* Demo accounts */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-xs font-semibold text-blue-700 mb-3">Tài khoản demo</p>
-            <div className="flex flex-col gap-2">
-              {[
-                { label: "Quản trị viên", user: "admin", pass: "Admin@123", color: "bg-blue-100 text-blue-700" },
-                { label: "Nhân viên", user: "staff", pass: "Staff@123", color: "bg-indigo-100 text-indigo-700" },
-                { label: "Sinh viên", user: "sv2026001", pass: "Ktx@123456", color: "bg-green-100 text-green-700" },
-              ].map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleQuickLogin(d.user, d.pass)}
-                  className="flex items-center justify-between px-3 py-2 bg-white border border-blue-100 rounded-lg hover:border-blue-300 transition-colors group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${d.color}`}>{d.label}</span>
-                    <span className="text-xs text-slate-500 font-mono">{d.user}</span>
-                  </div>
-                  <span className="text-xs text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                    Điền nhanh &rarr;
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-8 text-center text-xs text-slate-500">
             Chưa có tài khoản sinh viên?{" "}
             <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-700">
               Đăng ký tài khoản
@@ -537,6 +572,131 @@ export const LoginPage: React.FC = () => {
               </Button>
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Social Account Linking Modal */}
+      <Modal
+        isOpen={isLinkModalOpen}
+        onClose={() => setIsLinkModalOpen(false)}
+        title="Liên kết tài khoản Facebook"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200/80 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shrink-0">
+              f
+            </div>
+            <div className="min-w-0 text-xs">
+              <p className="font-bold text-slate-800">
+                Chào bạn, {linkModalData?.name || 'Người dùng Facebook'}!
+              </p>
+              <p className="text-slate-500 text-[11px] mt-0.5">
+                Tài khoản Facebook này chưa được liên kết với hồ sơ KTX nào. Bạn hãy chọn phương thức tiếp tục:
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switch Tabs */}
+          <div className="flex border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setLinkTab('existing')}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition ${
+                linkTab === 'existing'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              1. Đã có tài khoản KTX
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinkTab('new')}
+              className={`flex-1 py-2 text-xs font-bold text-center border-b-2 transition ${
+                linkTab === 'new'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              2. Tạo hồ sơ sinh viên mới
+            </button>
+          </div>
+
+          {linkError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{linkError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleConfirmLink} className="space-y-3.5 pt-1">
+            {linkTab === 'existing' ? (
+              <>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Nhập thông tin tài khoản KTX của bạn. Sau khi liên kết, các lần đăng nhập Facebook sau sẽ tự động vào thẳng tài khoản này.
+                </p>
+                <Input
+                  label="Tên đăng nhập hoặc Mã số sinh viên (MSSV)"
+                  placeholder="Ví dụ: sv2026001 hoặc 1822041524..."
+                  value={linkUsername}
+                  onChange={(e) => setLinkUsername(e.target.value)}
+                  icon={<User className="w-4 h-4" />}
+                  required
+                />
+                <Input
+                  label="Mật khẩu tài khoản KTX"
+                  type="password"
+                  placeholder="Nhập mật khẩu KTX..."
+                  value={linkPassword}
+                  onChange={(e) => setLinkPassword(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  required
+                />
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Nhập thông tin chính xác của bạn để hệ thống tạo hồ sơ sinh viên chuẩn chỉnh (không bị sinh số rác).
+                </p>
+                <Input
+                  label="Mã số sinh viên (MSSV thật)"
+                  placeholder="Ví dụ: 1822041524..."
+                  value={customStudentCode}
+                  onChange={(e) => setCustomStudentCode(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Số điện thoại cá nhân"
+                  placeholder="Ví dụ: 0968231204..."
+                  value={customPhone}
+                  onChange={(e) => setCustomPhone(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Email liên hệ (Tùy chọn)"
+                  type="email"
+                  placeholder="student@example.com..."
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
+                />
+              </>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={() => setIsLinkModalOpen(false)}
+              >
+                Hủy bỏ
+              </Button>
+              <Button type="submit" size="md" loading={linkLoading}>
+                {linkTab === 'existing' ? 'Xác nhận liên kết & Đăng nhập' : 'Tạo tài khoản & Đăng nhập'}
+              </Button>
+            </div>
+          </form>
         </div>
       </Modal>
     </div>

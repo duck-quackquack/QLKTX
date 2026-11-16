@@ -14,6 +14,7 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/my', getMyInvoices);
+router.get('/my-invoices', getMyInvoices);
 router.get('/', authorize('Admin', 'Staff'), getInvoices);
 router.get('/:id', getInvoiceById);
 router.post('/', authorize('Admin', 'Staff'), createInvoice);

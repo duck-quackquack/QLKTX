@@ -8,9 +8,14 @@ import { Payment } from '../models/Payment.js';
 import { Registration } from '../models/Registration.js';
 import { RepairRequest } from '../models/RepairRequest.js';
 import { Violation } from '../models/Violation.js';
+import { syncExpiredContracts } from './contractController.js';
+import { syncOverdueInvoices } from './invoiceController.js';
 
 export const getStatistics = async (req, res, next) => {
   try {
+    await syncExpiredContracts();
+    await syncOverdueInvoices();
+
     const totalStudents = await Student.countDocuments();
     const activeStayingStudents = await Contract.countDocuments({ status: 2 });
     const totalBuildings = await Building.countDocuments();

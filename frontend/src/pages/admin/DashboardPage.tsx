@@ -15,8 +15,12 @@ import {
   TrendingUp,
   Building2,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Zap,
+  CreditCard,
+  Sparkles
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   BarChart,
   Bar,
@@ -35,16 +39,28 @@ import {
 import { Link } from 'react-router-dom';
 
 const formatCurrency = (val: number) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val || 0);
 
 const formatShortCurrency = (val: number) => {
-  if (val >= 1e9) return `${(val / 1e9).toFixed(1)}B`;
-  if (val >= 1e6) return `${(val / 1e6).toFixed(0)}M`;
-  if (val >= 1e3) return `${(val / 1e3).toFixed(0)}K`;
-  return `${val}`;
+  if (!val || val === 0) return '0đ';
+  if (val >= 1e9) {
+    const b = val / 1e9;
+    return `${b.toFixed(2).replace(/\.?0+$/, '')}B`;
+  }
+  if (val >= 1e6) {
+    const m = val / 1e6;
+    return `${m.toFixed(2).replace(/\.?0+$/, '')}M`;
+  }
+  if (val >= 1e3) {
+    const k = val / 1e3;
+    return `${k.toFixed(1).replace(/\.?0+$/, '')}K`;
+  }
+  return `${new Intl.NumberFormat('vi-VN').format(val)}đ`;
 };
 
 export const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
+  const isStaff = user?.role === 2;
   const [stats, setStats] = useState<DashboardStatistics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -95,24 +111,120 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="flex-1 pb-12 bg-slate-50 min-h-screen">
       <Header
-        title="Tổng quan Ký túc xá"
-        subtitle="Theo dõi chỉ số lưu trú, tỷ lệ lấp đầy phòng và tình hình tài chính KTX"
+        title={isStaff ? 'Cổng Tác Nghiệp Ký Túc Xá' : 'Tổng quan Ký túc xá'}
+        subtitle={
+          isStaff
+            ? 'Cổng tác nghiệp vận hành hàng ngày dành cho Nhân viên KTX — Quản lý phòng, điện nước, thu phí và sự vụ'
+            : 'Theo dõi chỉ số lưu trú, tỷ lệ lấp đầy phòng và tình hình tài chính KTX'
+        }
       />
 
       <div className="max-w-7xl mx-auto px-6 mt-6 space-y-6">
         {/* Welcome Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
           <div>
-            <h1 className="text-lg font-bold text-slate-800">Xin chào, Quản trị viên 👋</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Hệ thống đang hoạt động ổn định. Dưới đây là dữ liệu cập nhật theo thời gian thực.
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-lg font-bold text-slate-800">
+                Xin chào, {user?.fullName || (isStaff ? 'Nhân viên KTX' : 'Quản trị viên')} 👋
+              </h1>
+              <span
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  isStaff
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-blue-50 text-blue-800 border-blue-200'
+                }`}
+              >
+                {isStaff ? 'Nhân viên KTX (Vận hành)' : 'Quản trị viên hệ thống'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {isStaff
+                ? 'Dưới đây là các đầu việc nghiệp vụ cần xử lý ngay, chỉ số công tơ điện nước và tình hình lưu trú.'
+                : 'Hệ thống đang hoạt động ổn định. Báo cáo tình hình lưu trú, doanh thu và vận hành KTX.'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1.5">
-              <Calendar size={14} />
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+              <Calendar size={14} className="text-slate-500" />
               {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
             </span>
+          </div>
+        </div>
+
+        {/* Bàn tác nghiệp nhanh (Quick Operations Hub) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              {isStaff ? 'Nhiệm vụ tác nghiệp hàng ngày' : 'Lối tắt quản trị nhanh'}
+            </h2>
+            <span className="text-[11px] text-slate-400">Thao tác 1 chạm</span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Link
+              to="/admin/meter-readings"
+              className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/50 hover:from-amber-100/80 hover:to-orange-100/60 border border-amber-200/80 rounded-xl transition-all shadow-xs group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <Zap size={16} />
+                </div>
+                <ArrowRight size={14} className="text-amber-500 group-hover:translate-x-1 transition-transform" />
+              </div>
+              <p className="font-bold text-xs text-amber-950 mt-2.5">Ghi điện & nước</p>
+              <p className="text-[11px] text-amber-800/80 mt-0.5">Nhập chỉ số công tơ tháng</p>
+            </Link>
+
+            <Link
+              to="/admin/payments"
+              className="p-3.5 bg-gradient-to-br from-emerald-50 to-teal-50/50 hover:from-emerald-100/80 hover:to-teal-100/60 border border-emerald-200/80 rounded-xl transition-all shadow-xs group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <CreditCard size={16} />
+                </div>
+                <ArrowRight size={14} className="text-emerald-500 group-hover:translate-x-1 transition-transform" />
+              </div>
+              <p className="font-bold text-xs text-emerald-950 mt-2.5">Thu tiền & Thanh toán</p>
+              <p className="text-[11px] text-emerald-800/80 mt-0.5">Lập phiếu thu / QR đối soát</p>
+            </Link>
+
+            <Link
+              to="/admin/repairs"
+              className="p-3.5 bg-gradient-to-br from-orange-50 to-rose-50/50 hover:from-orange-100/80 hover:to-rose-100/60 border border-orange-200/80 rounded-xl transition-all shadow-xs group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center shadow-xs">
+                  <Wrench size={16} />
+                </div>
+                {stats.pendingRepairs > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-600 text-white">
+                    {stats.pendingRepairs} chờ xử lý
+                  </span>
+                )}
+              </div>
+              <p className="font-bold text-xs text-orange-950 mt-2.5">Xử lý sửa chữa</p>
+              <p className="text-[11px] text-orange-800/80 mt-0.5">Tiếp nhận báo hỏng thiết bị</p>
+            </Link>
+
+            <Link
+              to="/admin/violations"
+              className="p-3.5 bg-gradient-to-br from-purple-50 to-indigo-50/50 hover:from-purple-100/80 hover:to-indigo-100/60 border border-purple-200/80 rounded-xl transition-all shadow-xs group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                  <AlertTriangle size={16} />
+                </div>
+                {stats.pendingViolations > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-600 text-white">
+                    {stats.pendingViolations} vụ việc
+                  </span>
+                )}
+              </div>
+              <p className="font-bold text-xs text-purple-950 mt-2.5">Biên bản vi phạm</p>
+              <p className="text-[11px] text-purple-800/80 mt-0.5">Lập biên bản kỷ luật KTX</p>
+            </Link>
           </div>
         </div>
 
@@ -147,7 +259,7 @@ export const DashboardPage: React.FC = () => {
           <StatCard
             title="Hóa đơn chưa thu"
             value={formatShortCurrency(stats.totalUnpaidAmount)}
-            subtitle="Tổng nợ cần thu"
+            subtitle={`Tổng nợ: ${formatCurrency(stats.totalUnpaidAmount)}`}
             icon={<Receipt size={20} className="text-rose-500" />}
             iconBg="bg-rose-50"
           />

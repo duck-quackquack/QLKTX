@@ -13,6 +13,7 @@ import {
   MeterReading,
   Invoice,
   Payment,
+  BankAccount,
   Violation,
   RepairRequest,
   NotificationItem,
@@ -27,6 +28,8 @@ export const authApi = {
   getMe: (): Promise<ApiResponse<User>> => axiosClient.get('/auth/me'),
   changePassword: (data: any): Promise<ApiResponse<boolean>> => axiosClient.post('/auth/change-password', data),
   updateProfile: (data: any): Promise<ApiResponse<User>> => axiosClient.put('/auth/profile', data),
+  verifyPass: (code: string): Promise<ApiResponse<any>> => axiosClient.get(`/auth/verify-pass/${encodeURIComponent(code)}`),
+  linkSocial: (data: any): Promise<ApiResponse<any>> => axiosClient.post('/auth/link-social', data),
 };
 
 export const studentApi = {
@@ -36,6 +39,9 @@ export const studentApi = {
   update: (id: number, data: any): Promise<ApiResponse<Student>> => axiosClient.put(`/students/${id}`, data),
   delete: (id: number): Promise<ApiResponse<any>> => axiosClient.delete(`/students/${id}`),
   getActiveStaying: (): Promise<ApiResponse<Student[]>> => axiosClient.get('/students/active-staying'),
+  getFaculties: (): Promise<ApiResponse<{ name: string; count: number }[]>> => axiosClient.get('/students/faculties'),
+  updateFaculty: (data: { oldName: string; newName: string }): Promise<ApiResponse<any>> => axiosClient.put('/students/faculties', data),
+  deleteFaculty: (data: { facultyName: string; transferTo?: string }): Promise<ApiResponse<any>> => axiosClient.delete('/students/faculties', { data }),
 };
 
 export const buildingApi = {
@@ -111,6 +117,7 @@ export const violationApi = {
   getById: (id: number): Promise<ApiResponse<Violation>> => axiosClient.get(`/violations/${id}`),
   create: (data: any): Promise<ApiResponse<Violation>> => axiosClient.post('/violations', data),
   updateStatus: (id: number, data: any): Promise<ApiResponse<Violation>> => axiosClient.put(`/violations/${id}/status`, data),
+  pay: (id: number, data?: any): Promise<ApiResponse<Violation>> => axiosClient.post(`/violations/${id}/pay`, data),
   delete: (id: number): Promise<ApiResponse<any>> => axiosClient.delete(`/violations/${id}`),
 };
 
@@ -120,6 +127,7 @@ export const repairApi = {
   getById: (id: number): Promise<ApiResponse<RepairRequest>> => axiosClient.get(`/repairs/${id}`),
   create: (data: any): Promise<ApiResponse<RepairRequest>> => axiosClient.post('/repairs', data),
   updateStatus: (id: number, data: any): Promise<ApiResponse<RepairRequest>> => axiosClient.put(`/repairs/${id}/status`, data),
+  pay: (id: number, data?: any): Promise<ApiResponse<RepairRequest>> => axiosClient.post(`/repairs/${id}/pay`, data),
 };
 
 export const notificationApi = {
@@ -133,4 +141,14 @@ export const notificationApi = {
 export const dashboardApi = {
   getStatistics: (): Promise<ApiResponse<DashboardStatistics>> => axiosClient.get('/dashboard/statistics'),
 };
+
+export const bankAccountApi = {
+  getAll: (): Promise<ApiResponse<BankAccount[]>> => axiosClient.get('/bank-accounts'),
+  getById: (id: number): Promise<ApiResponse<BankAccount>> => axiosClient.get(`/bank-accounts/${id}`),
+  create: (data: any): Promise<ApiResponse<BankAccount>> => axiosClient.post('/bank-accounts', data),
+  update: (id: number, data: any): Promise<ApiResponse<BankAccount>> => axiosClient.put(`/bank-accounts/${id}`, data),
+  setDefault: (id: number): Promise<ApiResponse<BankAccount>> => axiosClient.patch(`/bank-accounts/${id}/default`),
+  delete: (id: number): Promise<ApiResponse<any>> => axiosClient.delete(`/bank-accounts/${id}`),
+};
+
 

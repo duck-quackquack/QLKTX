@@ -14,7 +14,7 @@ router.use(protect);
 
 router.get('/', getBuildings);
 router.get('/:id', getBuildingById);
-router.post('/', authorize(1, 2), createBuilding);
+router.post('/', authorize(1), createBuilding);
 router.put('/:id', authorize(1, 2), updateBuilding);
 router.delete('/:id', authorize(1), deleteBuilding);
 

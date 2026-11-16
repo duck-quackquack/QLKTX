@@ -11,6 +11,9 @@ const repairRequestSchema = new mongoose.Schema(
     priority: { type: Number, default: 2 }, // 1: Low, 2: Medium, 3: High, 4: Urgent
     status: { type: Number, default: 1 }, // 1: Pending, 2: Processing, 3: Completed, 4: Cancelled
     repairCost: { type: Number, default: 0 },
+    isPaid: { type: Boolean, default: false },
+    paidAt: { type: Date, default: null },
+    paymentTransactionCode: { type: String, default: null },
     staffNotes: { type: String, default: null },
     completedAt: { type: Date, default: null },
   },
