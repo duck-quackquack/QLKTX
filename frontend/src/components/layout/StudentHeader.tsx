@@ -47,9 +47,9 @@ export const StudentHeader: React.FC = () => {
   const navItems = [
     { label: 'Trang chủ', path: '/student/dashboard', icon: LayoutDashboard },
     { label: 'Đăng ký phòng', path: '/student/register-room', icon: BedDouble },
-    { label: 'Phòng của tôi', path: '/student/room', icon: DoorOpen },
+    { label: 'Phòng ở', path: '/student/room', icon: DoorOpen },
     { label: 'Hợp đồng', path: '/student/contracts', icon: FileText },
-    { label: 'Hóa đơn & Thanh toán', path: '/student/invoices', icon: CreditCard },
+    { label: 'Hóa đơn & Thanh toán', shortLabel: 'Thanh toán', path: '/student/invoices', icon: CreditCard },
     { label: 'Báo hỏng', path: '/student/repairs', icon: Wrench },
     { label: 'Vi phạm', path: '/student/violations', icon: AlertTriangle },
   ];
@@ -63,7 +63,7 @@ export const StudentHeader: React.FC = () => {
     <>
       {/* Top Navbar Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo & Portal Title */}
             <div className="flex items-center gap-3 shrink-0">
@@ -80,7 +80,7 @@ export const StudentHeader: React.FC = () => {
                       Sinh Viên
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+                  <p className="text-[11px] text-slate-500 font-medium hidden 2xl:block">
                     Cổng Đời Sống Ký Túc Xá
                   </p>
                 </div>
@@ -88,7 +88,7 @@ export const StudentHeader: React.FC = () => {
             </div>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-1">
+            <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 shrink-0">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -96,14 +96,23 @@ export const StudentHeader: React.FC = () => {
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 xl:px-3 xl:py-2 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span>{item.label}</span>
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className="whitespace-nowrap">
+                      {item.shortLabel ? (
+                        <>
+                          <span className="hidden xl:inline">{item.label}</span>
+                          <span className="inline xl:hidden">{item.shortLabel}</span>
+                        </>
+                      ) : (
+                        item.label
+                      )}
+                    </span>
                   </NavLink>
                 );
               })}
